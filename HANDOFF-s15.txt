@@ -1,0 +1,161 @@
+# HANDOFF — Session 15 (2026-09-16)
+## rvemu + Bootstrap Project State
+
+---
+
+### 📍 WHERE WE ARE
+
+**Project root**: `/home/no/Desktop/github/riscv_emulator-seulgi-v1/`
+
+**rvemu (QEMU virt RISC-V emulator)** — ✅ WORKING
+- Binary: `./build/main` (builds via `./build.sh`)
+- Self-test: `./build/main --selftest` → ALL PASS
+- Fixed bugs: 1 real bug in `src/trap.c:75` (irq_enabled for S-mode), MTIMECMP CSR (0x14D), WFI wake logic
+
+**xv6-riscv** — ✅ BOOTS TO SHELL
+- Local clone: `./xv6-riscv/` (patched `kalloc.c` — `kfree()` skips `memset`)
+- Boots to `$` prompt in ~50M instructions:
+  ```bash
+  ./build/main -k xv6-riscv/kernel/kernel -f xv6-riscv/fs.img --max-inst 50000000
+  ```
+
+**Buildroot (Linux images)** — 🔄 IN PROGRESS (PAUSED)
+- Building in `./buildroot/` — was compiling host tools (gawk)
+- Log: `./buildroot_build.log` (659 KB)
+- Output dir: `./buildroot/output/images/` (empty yet)
+- **Can resume later** — run `./build_buildroot.sh` or `cd buildroot && make`
+
+---
+
+### 🎯 IMMEDIATE NEXT STEPS (Priority Order)
+
+| # | Task | Command / Notes |
+|---|------|-----------------|
+| 1 | **Resume Buildroot** when ready | `./build_buildroot.sh` (or `cd buildroot && make`) |
+| 2 | **Test Linux boot** once images exist | `./build/main --linux -k buildroot/output/images/Image -f buildroot/output/images/rootfs.ext2 --max-inst 10000000` |
+| 3 | **Add syscall ABI to rvemu** | Implement `src/syscall.c` + trap handler for write/read/exit/brk/fstat/lseek |
+| 4 | **Cross-compile newlib/musl** for bare-metal RISC-V | Needed to compile `prisc+x.c` as bare-metal ELF |
+
+---
+
+### 🤔 YOUR QUESTION: "Do we need our own mini RISC-V compiler + kernel?"
+
+**Short answer**: Not yet. Here's the strategy:
+
+#### Current Path (Legacy Linux First) — This Week
+```
+rvemu (QEMU virt) → Buildroot Linux (Image + rootfs.ext2) → Full userspace
+```
+- Proves rvemu completeness (VirtIO, MMU, SMP, syscalls)
+- Gives us a working Linux environment to run `prisc+x.c` as a Linux binary
+- **No custom compiler/kernel needed**
+
+#### Medium-Term Path (Bare-Metal + prisc+x) — This Month
+```
+rvemu + syscall ABI + newlib/musl → prisc+x.c as bare-metal ELF
+```
+- Cross-compile newlib or musl for `riscv64-unknown-elf`
+- Link `prisc+x.c` → bare-metal ELF → run on rvemu
+- **No custom compiler needed** — use upstream GCC + newlib
+
+#### Long-Term Path (Bootstrap from NAND) — The Vision
+```
+NAND (HDLb0) → RV1 → RV2 → RV4 → RV8 → RV16 → RV32I (HDLb0 design)
+                                        ↓
+                              rvemu (execution layer)
+                                        ↓
+                              prisc+x VM (software bridge)
+                                        ↓
+                              Self-hosting C compiler (written in prisc+x)
+                                        ↓
+                              Linux kernel (compiled by bootstrapped compiler)
+```
+- **Custom compiler YES** — but written IN prisc+x, not C
+- **Custom kernel YES** — but compiled BY the bootstrapped compiler
+- HDLb0 is for VERIFICATION/EDUCATION; rvemu is for EXECUTION
+
+---
+
+### 🖥️ X11 MONITOR SIMULATION — Future
+
+When you want graphical output:
+- Add VirtIO GPU device to rvemu (QEMU virt supports `virtio-gpu-pci`)
+- Map framebuffer to X11 window via SDL2 or raw Xlib
+- Or simpler: UART console + VT100 escape codes for now
+
+---
+
+### 📁 KEY FILES & LOCATIONS
+
+| File | Purpose |
+|------|---------|
+| `./build/main` | rvemu binary |
+| `./build.sh` | Build script (GCC direct) |
+| `./test_emulator.sh` | Test suite (selftest, xv6, Linux) |
+| `./build_buildroot.sh` | Buildroot build script |
+| `./buildroot_build.log` | Buildroot log (tail -f to monitor) |
+| `./xv6-riscv/kernel/kalloc.c` | Patched kfree (no memset) |
+| `src/trap.c:75` | Fixed irq_enabled() |
+| `src/csr.c` | MTIMECMP (0x14D) handling |
+| `src/cpu.c` | WFI wake (`for_wfi` param) |
+| `0.hdl0+prisc-bootstrap/prisc+x.c` | 770-line VM/PAL (needs libc) |
+| `0.hdl0+prisc-bootstrap/.../nand]z0]FIXD.c` | NAND gate (HDLb0) |
+
+---
+
+### 📋 DOCUMENTATION (Read These)
+- `INVESTIGATION_REPORT.md` — Technical bug analysis
+- `ROADMAP.md` — Full 10-milestone bootstrap plan (M1–M10)
+- `TODO.md` — Task checklist with status
+
+---
+
+### ⚡ QUICK COMMANDS
+
+```bash
+# Build rvemu
+./build.sh
+
+# Self-test
+./build/main --selftest
+
+# Run xv6 to shell (~50M inst, ~30 sec)
+./build/main -k xv6-riscv/kernel/kernel -f xv6-riscv/fs.img --max-inst 50000000
+
+# Resume Buildroot (when ready)
+./build_buildroot.sh
+
+# Test Linux (after Buildroot done)
+./build/main --linux -k buildroot/output/images/Image -f buildroot/output/images/rootfs.ext2 --max-inst 10000000
+
+# Full test suite
+./test_emulator.sh
+```
+
+---
+
+### 🧭 DECISION LOG
+
+| Decision | Rationale |
+|----------|-----------|
+| Use QEMU virt platform | Standard, well-documented, Linux support |
+| Fix rvemu bugs only | Don't rewrite; it works |
+| Patch xv6 kfree() | Skip 50M-inst zeroing loop for fast iteration |
+| Buildroot for Linux images | Prebuilt URLs 404; Buildroot is reproducible |
+| prisc+x.c on Linux first | Avoids bare-metal libc porting complexity |
+| HDLb0 for verification only | Too slow for RV32I execution; rvemu is fast |
+
+---
+
+### 🎪 FOR THE NEXT AGENT
+
+1. **Check Buildroot status**: `tail buildroot_build.log` — if still running, let it finish
+2. **Test Linux boot** once `Image` + `rootfs.ext2` appear in `buildroot/output/images/`
+3. **Start syscall ABI** in `src/trap.c` / new `src/syscall.c` — needed for bare-metal prisc+x
+4. **Cross-compile newlib** — `riscv64-unknown-elf-gcc` + newlib configure for bare-metal
+
+**No need to write a compiler or kernel yet.** The bootstrap vision uses prisc+x to WRITE the compiler, not C. We're still in the "prove rvemu works + run prisc+x on Linux" phase.
+
+---
+
+*Generated 2026-09-16 — Session 15 handoff*

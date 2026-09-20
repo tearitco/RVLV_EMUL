@@ -1,0 +1,19 @@
+⚠️ai is bad at this if u dont tell it ram starts @ 16  = "10000"⚠️
+
+
+we want to add a feature where we can control "cli of halo using arg2 example :  generic  ./+x/0.hdlb0🧿️.☮️16\]pr5\]#ab\]HALO.+x playground/d_latch.hlo commands.txt
+file, it will read each cycle and do all the commands + if there is a new command than last count .
+
+(user should still beable to input thru cli, we just want another option)
+
+it will read via newline as 
+Options: '1' flip switch_0, '2' flip switch_1, 's' step, 'r' run, 'q' quit, [Enter] step: 
+ie :
+commands.txt = "
+1
+s
+1
+q
+"
+
+ie we can step thru , flip switches etc, then ai can test its own chips)
