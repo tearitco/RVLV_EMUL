@@ -1,0 +1,144 @@
+# RVLV_EMUL — Handoff Prompt for Next Agent (Bigger Machine)
+
+## 🎯 MISSION
+Continue rvemu development on a bigger machine. Repo is at: `~/Desktop/github/RVLV_EMUL`
+
+---
+
+## 📦 QUICK START (Run These First)
+
+```bash
+cd ~/Desktop/github/RVLV_EMUL
+chmod +x install_deps.sh
+./install_deps.sh
+```
+
+This installs: GCC, RISC-V cross-compiler (gcc-riscv64-unknown-elf), QEMU, device-tree-compiler, build tools, then builds rvemu and runs self-test.
+
+---
+
+## 📍 CURRENT STATE (What Works)
+
+| Component | Status | Location |
+|-----------|--------|----------|
+| **rvemu** (QEMU virt RV64GC) | ✅ Working, selftest passes | `./build/main` |
+| **xv6-riscv** (patched) | ✅ Boots to `$` shell prompt | `./xv6-riscv/` |
+| **Buildroot** (Linux images) | 🔄 Partial — source ready, needs build | `./buildroot/` |
+| **prisc+x.c** (770-line VM) | ⏳ Needs libc (run on Linux first) | `./0.hdl0+prisc-bootstrap/prisc+x.c` |
+| **HDLb0** (NAND→CPU hardware layer) | 📚 Research/verification only | `./0.hdl0+prisc-bootstrap/...` |
+
+**Key fixes already in rvemu:**
+- `src/trap.c:75` — `irq_enabled()` fixed for S-mode non-delegated interrupts
+- `src/csr.c` — MTIMECMP (0x14D) CSR write support
+- `src/cpu.c` — WFI wake logic (`for_wfi` param), BSS zeroing for raw binaries
+
+---
+
+## 🚀 IMMEDIATE TASKS (Priority Order)
+
+### 1. Complete Buildroot Linux Build (~30-60 min)
+```bash
+./build_buildroot.sh
+# Produces: buildroot/output/images/Image + rootfs.ext2
+```
+
+### 2. Test Linux Boot on rvemu
+```bash
+./build/main --linux -k buildroot/output/images/Image -f buildroot/output/images/rootfs.ext2 --max-inst 10000000
+```
+
+### 3. Implement Syscall ABI in rvemu (Needed for bare-metal prisc+x)
+- **Files**: `src/trap.c` (ecall handler) + new `src/syscall.c`
+- **Syscalls**: write(64), read(63), exit(93), brk(214), fstat(80), lseek(62), open(1024), close(57)
+- **Architecture**: Check `a7` — if >= 0x100000 → SBI, else → Linux syscall ABI
+
+### 4. Cross-compile newlib/musl for Bare-Metal RISC-V
+```bash
+# After syscall ABI works, compile prisc+x.c as bare-metal ELF
+riscv64-unknown-elf-gcc -nostdlib -static -o prisc_x.elf prisc+x.c  # needs newlib
+```
+
+### 5. Run prisc+x.c on rvemu (First as Linux binary, then bare-metal)
+```bash
+# On Linux (after Buildroot):
+./build/main --linux -k buildroot/output/images/Image -f buildroot/output/images/rootfs.ext2 -a "prisc_x.elf"
+```
+
+---
+
+## 🏗️ LONG-TERM VISION (Bootstrap from NAND)
+
+```
+NAND (HDLb0) → RV1 → RV2 → RV4 → RV8 → RV16 → RV32I (HDLb0 design)
+                                    ↓
+                              rvemu (execution layer)
+                                    ↓
+                              prisc+x VM (software bridge)
+                                    ↓
+                              Self-hosting C compiler (written IN prisc+x)
+                                    ↓
+                              Linux kernel (compiled BY bootstrapped compiler)
+```
+
+**You do NOT need to write a compiler/kernel in C now.** The bootstrap compiler will be written IN prisc+x assembly, then compile itself. rvemu is the execution layer; HDLb0 is for verification.
+
+---
+
+## 📁 KEY FILES
+
+| File | Purpose |
+|------|---------|
+| `./build/main` | rvemu binary |
+| `./build.sh` | Build script (GCC direct) |
+| `./test_emulator.sh` | Test suite (selftest, xv6, Linux) |
+| `./build_buildroot.sh` | Buildroot build script |
+| `./xv6-riscv/kernel/kalloc.c` | Patched kfree (no memset) |
+| `src/trap.c:75` | Fixed irq_enabled() |
+| `src/csr.c` | MTIMECMP handling |
+| `src/cpu.c` | WFI wake logic |
+| `INVESTIGATION_REPORT.md` | Technical bug analysis |
+| `ROADMAP.md` | 10-milestone bootstrap plan (M1–M10) |
+| `TODO.md` | Task checklist |
+| `HANDOFF-s15.txt` | Previous session handoff |
+
+---
+
+## 🧪 TEST COMMANDS
+
+```bash
+# Self-test
+./build/main --selftest
+
+# xv6 to shell (~30 sec)
+./build/main -k xv6-riscv/kernel/kernel -f xv6-riscv/fs.img --max-inst 50000000
+
+# Linux (after Buildroot)
+./build/main --linux -k buildroot/output/images/Image -f buildroot/output/images/rootfs.ext2 --max-inst 10000000
+
+# Full test suite
+./test_emulator.sh
+```
+
+---
+
+## ⚠️ NOTES FOR BIGGER MACHINE
+
+- **Buildroot downloads ~2-3 GB** — ensure disk space
+- **Buildroot uses all cores** — `make -j$(nproc)` in script
+- **rvemu is single-threaded** — no parallelism needed for emulator
+- **xv6-riscv is a git submodule** — already cloned in repo
+- **prisc+x.c needs POSIX libc** — run on Linux first, bare-metal later
+
+---
+
+## 🎪 WHAT TO DO FIRST ON NEW MACHINE
+
+1. Run `./install_deps.sh` (installs everything, builds rvemu, runs selftest)
+2. Run `./build_buildroot.sh` (go get coffee — 30-60 min)
+3. Test Linux boot
+4. Start syscall ABI implementation (`src/syscall.c`)
+
+---
+
+*Repo: ~/Desktop/github/RVLV_EMUL*
+*Generated: 2026-09-20*
