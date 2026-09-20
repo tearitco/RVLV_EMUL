@@ -1,7 +1,7 @@
 # RVLV_EMUL — Handoff Prompt for Next Agent (Bigger Machine)
 
 ## 🎯 MISSION
-Continue rvemu development on a bigger machine. Repo is at: `~/Desktop/github/RVLV_EMUL`
+Continue rvemu development on a bigger machine. GitHub repository: https://github.com/tearitco/RVLV_EMUL
 
 ---
 
@@ -140,5 +140,5 @@ NAND (HDLb0) → RV1 → RV2 → RV4 → RV8 → RV16 → RV32I (HDLb0 design)
 
 ---
 
-*Repo: ~/Desktop/github/RVLV_EMUL*
+*Repo: https://github.com/tearitco/RVLV_EMUL*
 *Generated: 2026-09-20*
