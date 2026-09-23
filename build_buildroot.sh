@@ -3,7 +3,8 @@
 
 set -e
 
-BUILDROOT_DIR="/home/no/Desktop/github/riscv_emulator-seulgi-v1/buildroot"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BUILDROOT_DIR="$REPO_ROOT/buildroot"
 OUTPUT_DIR="$BUILDROOT_DIR/output"
 
 echo "=== Buildroot RISC-V QEMU virt Build ==="
@@ -34,5 +35,5 @@ echo "Kernel: $OUTPUT_DIR/images/Image"
 echo "Rootfs: $OUTPUT_DIR/images/rootfs.ext2 (or rootfs.cpio)"
 echo ""
 echo "To run with rvemu:"
-echo "  cd /home/no/Desktop/github/riscv_emulator-seulgi-v1"
+echo "  cd $REPO_ROOT"
 echo "  ./build/main --linux -k $OUTPUT_DIR/images/Image -f $OUTPUT_DIR/images/rootfs.ext2 --max-inst 10000000"

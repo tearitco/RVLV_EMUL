@@ -47,12 +47,17 @@ int cpu_step(CPU *cpu);
 void dump_registers(CPU *cpu);
 Trap cpu_load(CPU *cpu, uint64_t addr, uint64_t bits, uint64_t *out);
 Trap cpu_store(CPU *cpu, uint64_t addr, uint64_t bits, uint64_t value);
+Trap cpu_load_bytes(CPU *cpu, uint64_t addr, void *buf, uint64_t len);
+Trap cpu_store_bytes(CPU *cpu, uint64_t addr, const void *buf, uint64_t len);
+Trap cpu_load_string(CPU *cpu, uint64_t addr, char *buf, uint64_t maxlen);
 int cpu_pmp_ok(CPU *cpu, uint64_t addr, uint64_t nbytes, int access, int priv);
 Trap exec_fp(CPU *cpu, uint32_t inst);
 int sbi_ecall(CPU *cpu);
 void take_trap(CPU *cpu, Trap t);
 Trap check_interrupts(CPU *cpu, bool for_wfi);
 uint32_t decompress(uint16_t cinst, int *illegal);
+uint64_t syscall_handle(CPU *cpu, uint64_t a7, uint64_t a0, uint64_t a1, uint64_t a2,
+                        uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6);
 
 int load_image(CPU *cpu, const char *path, uint64_t default_addr, uint64_t *entry_out,
                uint64_t *size_out);

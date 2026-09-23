@@ -11,8 +11,8 @@ BUILDDIR="${BUILDDIR:-build}"
 APP="${1:-${BUILDDIR}/main}"
 
 SRCS=(main.c src/bus.c src/clint.c src/cpu.c src/csr.c src/dram.c src/dtb.c
-      src/fpu.c src/mmu.c src/plic.c src/sbi.c src/selftest.c src/trap.c
-      src/uart.c src/virtio.c)
+      src/fpu.c src/mmu.c src/plic.c src/sbi.c src/selftest.c src/syscall.c
+      src/trap.c src/uart.c src/virtio.c)
 
 mkdir -p "${BUILDDIR}"
 

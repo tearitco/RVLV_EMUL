@@ -38,7 +38,7 @@ int main(int argc, char **argv)
     const char *disk = nullptr;
     const char *initrd = nullptr;
     const char *dtb_file = nullptr;
-    const char *bootargs = "console=ttyS0,115200n8 root=/dev/vda rw";
+    const char *bootargs = "console=ttyS0,115200n8 root=/dev/vda rw rootwait";
     int linux_boot = 0;
     int virtio_legacy = 0;
     int dump = 0;

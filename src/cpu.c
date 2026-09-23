@@ -943,6 +943,16 @@ Trap cpu_execute(CPU *cpu, uint32_t inst, int ilen)
                     cpu->pc = next;
                     break;
                 }
+                uint64_t a7 = cpu->regs[17];
+                if (cpu->priv != PRIV_M && a7 < 0x100000) {
+                    uint64_t ret = syscall_handle(cpu, a7, cpu->regs[10], cpu->regs[11],
+                                                  cpu->regs[12], cpu->regs[13],
+                                                  cpu->regs[14], cpu->regs[15],
+                                                  cpu->regs[16]);
+                    cpu->regs[10] = ret;
+                    cpu->pc = next;
+                    break;
+                }
                 uint64_t c = cpu->priv == PRIV_M ? EX_ECALL_M
                                                  : cpu->priv == PRIV_S ? EX_ECALL_S : EX_ECALL_U;
                 return trap_ex(c, 0);
@@ -1121,6 +1131,52 @@ void dump_registers(CPU *cpu)
         printf("   %3s: %#-13.2" PRIx64 "\n", abi[i + 24], cpu->regs[i + 24]);
     }
     printf("pc=%" PRIx64 " priv=%u instret=%" PRIu64 "\n", cpu->pc, cpu->priv, cpu->instret);
+}
+
+Trap cpu_load_bytes(CPU *cpu, uint64_t addr, void *buf, uint64_t len) {
+    uint8_t *dst = (uint8_t*)buf;
+    while (len > 0) {
+        uint64_t chunk = len < 8 ? len : 8;
+        uint64_t val;
+        Trap t = cpu_load(cpu, addr, chunk * 8, &val);
+        if (t.taken) return t;
+        for (uint64_t i = 0; i < chunk; i++) {
+            dst[i] = (val >> (i * 8)) & 0xFF;
+        }
+        dst += chunk;
+        addr += chunk;
+        len -= chunk;
+    }
+    return trap_none();
+}
+
+Trap cpu_store_bytes(CPU *cpu, uint64_t addr, const void *buf, uint64_t len) {
+    const uint8_t *src = (const uint8_t*)buf;
+    while (len > 0) {
+        uint64_t chunk = len < 8 ? len : 8;
+        uint64_t val = 0;
+        for (uint64_t i = 0; i < chunk; i++) {
+            val |= ((uint64_t)src[i]) << (i * 8);
+        }
+        Trap t = cpu_store(cpu, addr, chunk * 8, val);
+        if (t.taken) return t;
+        src += chunk;
+        addr += chunk;
+        len -= chunk;
+    }
+    return trap_none();
+}
+
+Trap cpu_load_string(CPU *cpu, uint64_t addr, char *buf, uint64_t maxlen) {
+    for (uint64_t i = 0; i < maxlen - 1; i++) {
+        uint64_t val;
+        Trap t = cpu_load(cpu, addr + i, 8, &val);
+        if (t.taken) return t;
+        buf[i] = (char)val;
+        if (buf[i] == '\0') return trap_none();
+    }
+    buf[maxlen - 1] = '\0';
+    return trap_none();
 }
 
 typedef struct {

@@ -15,6 +15,15 @@
 #define VIRTIO_BLK_T_OUT   1
 #define VIRTIO_BLK_T_FLUSH 4
 
+#define VIRTIO_BLK_F_SIZE_MAX     1
+#define VIRTIO_BLK_F_SEG_MAX      2
+#define VIRTIO_BLK_F_GEOMETRY     4
+#define VIRTIO_BLK_F_RO           5
+#define VIRTIO_BLK_F_BLK_SIZE     6
+#define VIRTIO_BLK_F_TOPOLOGY     10
+#define VIRTIO_BLK_F_CONFIG_WCE   11
+#define VIRTIO_F_VERSION_1        32
+
 int virtio_init(VIRTIO *v, const char *disk_path, int legacy)
 {
     if (!v)
@@ -257,10 +266,19 @@ Trap virtio_load(VIRTIO *v, uint64_t addr, uint64_t bits, uint64_t *out)
         val = VIRTIO_VENDOR;
         break;
     case 0x010:
-        if (v->device_features_sel == 0)
+        if (v->device_features_sel == 0) {
+            val = (1u << VIRTIO_BLK_F_SIZE_MAX) |
+                  (1u << VIRTIO_BLK_F_SEG_MAX) |
+                  (1u << VIRTIO_BLK_F_GEOMETRY) |
+                  (1u << VIRTIO_BLK_F_RO) |
+                  (1u << VIRTIO_BLK_F_BLK_SIZE) |
+                  (1u << VIRTIO_BLK_F_TOPOLOGY) |
+                  (1u << VIRTIO_BLK_F_CONFIG_WCE);
+        } else if (v->device_features_sel == 1) {
+            val = (1u << (VIRTIO_F_VERSION_1 - 32));
+        } else {
             val = 0;
-        else
-            val = 0;
+        }
         break;
     case 0x034:
         val = 8;
