@@ -281,6 +281,11 @@ int generate_dtb(CPU *cpu, uint64_t dram_size, uint64_t initrd_start, uint64_t i
         goto fail;
     if (prop_str(&f, "compatible", "ns16550a") < 0)
         goto fail;
+    if (prop_str(&f, "status", "okay") < 0)
+        goto fail;
+    // Note: DTB only allows one "compatible" property with multiple strings
+    // The above sets it to "ns16550a" only. For multiple strings, we'd need
+    // to modify the prop_str to append, but let's keep it simple for now.
     uint32_t uart_reg[4] = { 0, 0x10000000, 0, 0x100 };
     if (prop_u32s(&f, "reg", uart_reg, 4) < 0)
         goto fail;

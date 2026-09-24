@@ -180,3 +180,5 @@ mkdir -p kernel
 ```
 
 **Decision:** Build our own minimal kernel config in-tree, not via Buildroot menuconfig. Buildroot stays for rootfs/initramfs scaffolding only.
+
+**Status (2026-09-24):** Minimal kernel config working — boots on rvemu with UART output, virtio-blk detection, and rootfs mount. Kernel is 3.3 MB (vs 27 MB full). Rootfs compatibility issue (SIGILL in dynamic linker) requires ISA fix but kernel itself is functional.

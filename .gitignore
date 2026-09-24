@@ -2,3 +2,26 @@ build/
 *.exe
 *.obj
 compile_commands.json
+
+# Kernel build artifacts
+kernel/Image
+kernel/Image-minimal
+kernel/Image-minimal2
+kernel/.config.old
+kernel/src/
+kernel/build/
+
+# Build outputs
+prisc_x
+prisc_x_bare.elf
+prisc_x_linux
+bare_test.elf
+
+# Initramfs
+initramfs/
+initramfs_test.cpio
+initramfs_test.cpio.gz
+
+# Test files
+run_test.sh
+test_autologin.exp

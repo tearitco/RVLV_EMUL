@@ -1,7 +1,7 @@
 # RVLV_EMUL Progress Report
 
 **Session Started:** 2026-09-20T06:40:28Z  
-**Last Updated:** 2026-09-23T06:20:00Z  
+**Last Updated:** 2026-09-24T16:30:00Z
 **Working Directory:** `/home/jb/Desktop/ele-desk+cal/1.RVEM/RVLV_EMUL`
 
 ---
@@ -33,10 +33,15 @@
 
 ## 🔄 In Progress
 
-### Minimal Linux Kernel Config (Started ~2026-09-23)
-- **Status:** Directory created, config next
-- **Purpose:** Fast boot test harness (tinyconfig + virtio only)
-- **Expected:** ~1-2 hrs
+### Minimal Linux Kernel Config (COMPLETE 2026-09-24)
+- [x] Create `kernel/` directory with `.config`
+- [x] Copy Linux 6.18.7 source from buildroot to `kernel/src/` (ref only)
+- [x] Enable 25+ required kernel config options
+- [x] Add serial console/earlycon drivers
+- [x] Enable VIRTIO_MMIO + VIRTIO_BLK + VIRTIO_CONSOLE + VIRTIO_NET
+- [x] Build minimal kernel Image (3.3 MB)
+- [x] Boot on rvemu: UART output ✅, virtio-blk detected ✅, rootfs mounted ✅
+- Note: Userspace SIGILL in dynamic linker (ISA extension mismatch; rootfs compatibility issue)
 
 ---
 
@@ -44,11 +49,10 @@
 
 | # | Task | Est. Time |
 |---|------|-----------|
-| 1 | Write minimal kernel `.config` (tinyconfig + virtio_blk/console/net/9p) | 1 hr |
-| 2 | Compile kernel with buildroot cross-compiler (scaffold) | 30 min |
-| 3 | Test minimal kernel boot on rvemu | 15 min |
-| 4 | RISC-V Assembler in prisc+x (`.pal` files) | 2-4 hrs |
-| 5 | C Compiler in prisc+x (`.pal` files) | 1-2 weeks |
+| 1 | RISC-V Assembler in prisc+x (`.pal` files) | 2-4 hrs |
+| 2 | C Compiler in prisc+x (`.pal` files) | 1-2 weeks |
+| 3 | Fix rootfs ISA compatibility for bare-metal userspace | 1-2 hrs |
+| 4 | Self-hosting: Compiler compiles prisc+x_bare.c | 2-4 hrs |
 
 ---
 
@@ -66,12 +70,13 @@
 | `prisc+x.c` | ✅ Works on host Linux + QEMU Linux |
 | `src/prisc_bare.c` | ✅ Complete (~750 lines, bare-metal) |
 | `musl` cross-compile | ✅ Done (`musl-install/`) |
-| `minimal Linux kernel` | 🔄 Config in progress |
+| `minimal Linux kernel` | ✅ Built & tested (`kernel/.config`, `kernel/Image`) |
+| `kernel/.config` | ✅ Minimal 3.3 MB config |
 | `rezip-rvem.sh` | ✅ Backup script working |
 
 ---
 
-## 🎯 Session Goal (Updated)
+## 🎯 Session Goals (Updated)
 
 1. ✅ Run `./install_deps.sh` equivalent (manual build done)
 2. ✅ Buildroot Linux images built
@@ -81,7 +86,8 @@
 6. ✅ Cross-compile musl for bare-metal RISC-V
 7. ✅ Write `prisc+x_bare.c` clean rewrite
 8. ✅ Run prisc+x bare-metal on rvemu
-9. 🔄 Build minimal Linux kernel for fast testing
+9. ✅ Build minimal Linux kernel for fast testing (M7 complete)
+10. ⏳ RISC-V Assembler in prisc+x (`.pal` files) — NEXT
 
 ---
 

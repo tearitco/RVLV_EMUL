@@ -17,6 +17,7 @@
 #define SYS_CLOSE   57
 #define SYS_FSTAT   80
 #define SYS_LSEEK   62
+#define SYS_SPAWN   400
 
 static int host_fd_map[16];
 static int host_fd_count = 3;
@@ -155,6 +156,23 @@ static uint64_t do_brk(CPU *cpu) {
     return cpu->bus.dram.size;
 }
 
+static uint64_t do_spawn(CPU *cpu, uint64_t pathname) {
+    (void)cpu;
+    char *path = malloc(256);
+    if (!path) return (uint64_t)(-ENOMEM);
+    
+    Trap t = cpu_load_string(cpu, pathname, path, 256);
+    if (t.taken) {
+        free(path);
+        return (uint64_t)(-EFAULT);
+    }
+    
+    /* For now, just log and return success - full ELF loading needs more infrastructure */
+    fprintf(stderr, "[SYS_SPAWN] Would load: %s\n", path);
+    free(path);
+    return 0;  /* Return 0 for success (placeholder) */
+}
+
 uint64_t syscall_handle(CPU *cpu, uint64_t a7, uint64_t a0, uint64_t a1, uint64_t a2,
                         uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6) {
     (void)a3; (void)a4; (void)a5; (void)a6;
@@ -172,6 +190,7 @@ uint64_t syscall_handle(CPU *cpu, uint64_t a7, uint64_t a0, uint64_t a1, uint64_
         case SYS_FSTAT:   return do_fstat(cpu, a0, a1);
         case SYS_LSEEK:   return do_lseek(a0, a1, a2);
         case SYS_BRK:     return do_brk(cpu);
+        case SYS_SPAWN:   return do_spawn(cpu, a0);
         case SYS_EXIT:    cpu->halt = 1; cpu->halt_code = a0; return 0;
         default:          return (uint64_t)(-ENOSYS);
     }

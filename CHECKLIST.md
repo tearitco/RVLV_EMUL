@@ -1,7 +1,7 @@
 # RVLV_EMUL — Master Checklist
 
-**Updated:** 2026-09-23  
-**Status:** M5 (rvemu runs Linux) ✅ | M6 (prisc+x on rvemu) ✅
+**Updated:** 2026-09-24
+**Status:** M5 (rvemu runs Linux) ✅ | M6 (prisc+x on rvemu) ✅ | M7 (minimal kernel) ✅
 
 ---
 
@@ -21,6 +21,25 @@
 | Linux boots on QEMU (with 9p) | ✅ | Verified 2026-09-22 |
 
 **Syscalls implemented:** write(64), read(63), open(1024), close(57), fstat(80), lseek(62), brk(214), exit(93), spawn(400)
+
+## ✅ PHASE 1b: Minimal Linux Kernel (M7 — COMPLETE)
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Create `kernel/` directory | ✅ | |
+| Copy Linux 6.18.7 source from buildroot | ✅ | `kernel/src/linux-6.18.7/` (ref only) |
+| Generate tinyconfig base | ✅ | |
+| Enable required kernel config options | ✅ | PRINTK, TTY, BLOCK, BINFMT_ELF |
+| Enable VirtIO drivers | ✅ | VIRTIO_MMIO, VIRTIO_BLK, VIRTIO_CONSOLE, VIRTIO_NET |
+| Enable filesystems | ✅ | EXT2_FS, 9P_FS, NET_9P |
+| Enable serial console | ✅ | SERIAL_8250, SERIAL_8250_CONSOLE, SERIAL_EARLYCON |
+| Enable earlycon for boot output | ✅ | `earlycon` in CONFIG_CMDLINE |
+| Enable userspace required opts | ✅ | MULTIUSER, POSIX_TIMERS, FUTEX, EPOLL, etc. |
+| Enable proc/sysfs/devtmpfs | ✅ | PROC_FS, SYSFS, DEVTMPFS |
+| Configure bootargs | ✅ | `console=ttyS0,115200n8 earlycon root=/dev/vda rw rootwait` |
+| Build minimal kernel Image | ✅ | 3.3 MB (vs 27 MB full kernel) |
+| Test boot on rvemu | ✅ | UART output, virtio-blk, rootfs mount all working |
+| Kernel config saved | ✅ | `kernel/.config` |
 
 ---
 
@@ -53,6 +72,8 @@
 - [x] Implement in rvemu (`src/syscall.c` do_spawn stub)
 - [x] Implement in prisc_bare (`builtin_spawn` custom op)
 - [x] Test: prisc+x custom op calls spawn syscall
+
+---
 
 ---
 
@@ -144,21 +165,8 @@ cd RVLV_EMUL && ./build.sh
 
 ## 🎯 NEXT ACTION
 
-**Write minimal kernel `.config`** in `RVLV_EMUL/kernel/`:
-
-```bash
-mkdir -p kernel
-# Create .config with:
-# - tinyconfig base
-# - CONFIG_VIRTIO_BLK=y
-# - CONFIG_VIRTIO_CONSOLE=y
-# - CONFIG_VIRTIO_NET=y
-# - CONFIG_9P_FS=y
-# - CONFIG_EXT2_FS=y
-# - All modules = n (built-in only)
-# Compile with buildroot cross-compiler:
-make -C kernel O=../kernel/build ARCH=riscv CROSS_COMPILE=riscv64-buildroot-linux-gnu- \
-  -j$(nproc)
-# Test on rvemu:
-./build/main --linux -k kernel/build/arch/riscv/boot/Image -f buildroot/output/images/rootfs.ext2 --max-inst 10000000
-```
+**Build RISC-V Assembler in prisc+x (`.pal`):**
+- First bootstrap tool: assembler parses RV32I asm → emits ELF
+- Target: runs on prisc+x_bare on rvemu
+- Location: `0.hdl0+prisc-bootstrap/asm.pal`
+- Est. time: 2-4 hours
