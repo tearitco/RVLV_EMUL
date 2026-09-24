@@ -41,7 +41,7 @@
 - [x] Enable VIRTIO_MMIO + VIRTIO_BLK + VIRTIO_CONSOLE + VIRTIO_NET
 - [x] Build minimal kernel Image (3.3 MB)
 - [x] Boot on rvemu: UART output ✅, virtio-blk detected ✅, rootfs mounted ✅
-- Note: Userspace SIGILL in dynamic linker (ISA extension mismatch; rootfs compatibility issue)
+- Note: Userspace SIGILL in dynamic linker (ISA extension mismatch; rootfs compatibility issue). Buildroot GCC targets `rv64imafd_zicsr_zifencei` but rvemu implements subset (no vector, limited CSR/ZIFENCEI). **Decision:** Skip ISA extension work for now — assembler only needs RV32I base instructions.
 
 ---
 

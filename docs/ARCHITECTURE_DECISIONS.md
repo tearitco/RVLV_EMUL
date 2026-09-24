@@ -182,3 +182,25 @@ mkdir -p kernel
 **Decision:** Build our own minimal kernel config in-tree, not via Buildroot menuconfig. Buildroot stays for rootfs/initramfs scaffolding only.
 
 **Status (2026-09-24):** Minimal kernel config working — boots on rvemu with UART output, virtio-blk detection, and rootfs mount. Kernel is 3.3 MB (vs 27 MB full). Rootfs compatibility issue (SIGILL in dynamic linker) requires ISA fix but kernel itself is functional.
+
+---
+
+## ISA Extension Decision (2026-09-24)
+
+**Question:** Should we implement missing ISA extensions (vector, full CSR/ZIFENCEI, compressed 64-bit) to fix the Buildroot rootfs SIGILL?
+
+**Answer:** No, not now. 
+
+**Reasoning:**
+1. rvemu uses `uint64_t` registers and PC — it already supports RV64 register width
+2. The SIGILL (`0x38270685`) is in the dynamic linker loading userspace, not the kernel
+3. The Buildroot toolchain targets `rv64imafd_zicsr_zifencei` with compressed instructions (C extension) for 64-bit operands
+4. The assembler in prisc+x (next task) only needs RV32I base instructions — it doesn't need Linux userspace
+5. Implementing missing ISA extensions is a ~2-4 week effort; the assembler can be built in 2-4 hours
+
+**When we might revisit:** If we need a working Linux userspace for testing. Options:
+- Rebuild Buildroot with `-march=rv64imafdc_zicsr` (disable compressed, match rvemu)
+- Implement missing instructions in rvemu (CSR, ZIFENCEI, compressed 64-bit)
+- Use xv6 userspace instead (simpler, already works on rvemu)
+
+**Current path:** Proceed with assembler in prisc+x. The assembler runs on prisc+x_bare (RV32I), needs no Linux userspace.
