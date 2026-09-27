@@ -66,6 +66,35 @@ OpenSBI `fw_jump` at `0x80000000` and kernel at `0x80200000`:
 build/main -b fw_jump.bin -k Image -f rootfs.img -i initrd.cpio
 ```
 
+#### Boot proof
+
+A minimal `init` script written to the rootfs proves userspace runs. Build the
+kernel/Buildroot image once (`./build_buildroot.sh`) and use the regenerated
+`kernel/Image` + `buildroot/output/images/rootfs.ext2`, then:
+
+```bash
+# Write a tiny init script into the ext2 rootfs
+cat > /tmp/start.sh <<'EOF'
+#!/bin/sh
+mount -t proc proc /proc
+exec > /dev/kmsg 2>&1
+echo "RVEMU_LINUX_OK kernel=$(cat /proc/version)"
+echo "cpu=$(head -1 /proc/cpuinfo)"
+poweroff -f
+EOF
+# (copy /tmp/start.sh into the rootfs as /sbin/start, then)
+build/main --linux -k kernel/Image -f rootfs.ext2 \
+  --max-inst 200000000 --bootargs "console=ttyS0,115200n8 earlycon root=/dev/vda rw rootwait init=/sbin/start"
+```
+
+Expected dmesg lines:
+```
+Run /sbin/start as init process
+RVEMU_LINUX_OK kernel=Linux version ...
+cpu=processor	: 0
+reboot: Power down
+```
+
 ### Options
 
 | Option | Meaning |
@@ -106,3 +135,15 @@ build/main tests/ori.bin
 A `p` environment test that `ecall`s with `a0=1` while `mtvec` is 0 is treated
 as PASS. SiFive test-finisher writes at `0x100000` (`0x5555` pass, `0x3333` fail)
 also stop the emulator.
+
+## Status / roadmap
+
+- **Linux boot (S-mode + SBI + generated DTB):** works to userspace. See
+  [`docs/RVEM_LINUX_BOOT_NOTES.md`](docs/RVEM_LINUX_BOOT_NOTES.md) for the root
+  causes that were fixed (FPU `FS=Off` SIGILL, non-M `ecall` interception, UART
+  DT node) and the kernel `.config` changes needed (`CONFIG_FPU`, `BINFMT_ELF`,
+  TTY/SERIAL/EXT4/VIRTIO/9P).
+- **Interactive serial console:** WIP — the ttyS0 console line does not register
+  on the root-level UART DT node yet. Use `/dev/kmsg` (visible in dmesg) to
+  observe userspace output in the meantime.
+- **Built-in `--selftest` and bare-metal tests:** passing.
