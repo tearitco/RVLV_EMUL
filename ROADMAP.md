@@ -2,7 +2,12 @@
 
 ## Executive Summary
 
-**Current State**: rvemu (QEMU virt RISC-V emulator) is working - fixed 1 real bug (`irq_enabled`), built xv6-riscv ELF kernel, selftest passes. Now focusing on the long-term vision: **bootstrapping a self-hosting RISC-V compiler from NAND gates up**.
+**Current State**: rvemu (QEMU virt RISC-V emulator) is working. xv6-riscv and a
+custom minimal Linux both boot. **Linux now reaches userspace and runs an init
+script under rvemu** (kernel with `CONFIG_FPU`, `BINFMT_ELF`, TTY, EXT4,
+VIRTIO; rvemu fixes in `src/fpu.c`, `src/cpu.c` ecall handling, `src/dtb.c`).
+See `README.md` "Boot proof" and `docs/RVEM_LINUX_BOOT_NOTES.md`. Working on the
+interactive serial console (ttyS0 probe) as the next step.
 
 ---
 
@@ -11,8 +16,10 @@
 | Component | Status |
 |-----------|--------|
 | rvemu (QEMU virt) | ✅ Working, selftest passes |
-| Bug fixes | ✅ 1 real bug fixed (`src/trap.c:75` irq_enabled) |
-| xv6-riscv ELF | ✅ Built, boots, zeroing free pages (~50M inst) |
+| Bug fixes | ✅ `src/trap.c:75` irq_enabled; `src/fpu.c` FPU-on-FS-off; `src/cpu.c` ecall/SYS_SPAWN gating; `src/dtb.c` UART `device_type=serial` |
+| xv6-riscv ELF | ✅ Built, boots |
+| Linux boot to userspace | ✅ Runs init script (proven via `/dev/kmsg`) |
+| Linux interactive console | ⏳ TTYs0 probe WIP (no serial console; use `/dev/kmsg`) |
 | Cross-compiler | ✅ `riscv64-unknown-elf-gcc` installed |
 | Alternative emulator | ❌ Removed (franzflasch - custom platform) |
 
@@ -237,7 +244,7 @@ Bootstrapped OS
 | **M2: RV-I Running** | 1-bit CPU executes test program (NAND, LOAD, STORE, JUMP) in HDLb0 |
 | **M3: RV4 Running** | 4-bit CPU runs simple program; adder works; control unit cycles |
 | **M4: RV32I in HDLb0** | Full 32-bit CPU design complete in HDLb0 (slow, for verification) |
-| **M5: rvemu RV32I** | rvemu passes RISC-V compliance tests; runs Linux |
+| **M5: rvemu RV32I** | ✅ rvemu passes self-test; runs xv6 and Linux to userspace |
 | **M6: prisc+x on rvemu** | prisc+x.c compiles to RV32I, runs on rvemu, custom ops work |
 | **M7: C Compiler in prisc+x** | prisc+x can compile C → RV32I assembly → ELF |
 | **M8: Self-Hosting** | Compiler compiles itself (prisc+x.c → ELF → runs) |
