@@ -196,8 +196,9 @@ static int64_t fcvt_to_l(double d, int unsigned_out, int width32)
 
 Trap exec_fp(CPU *cpu, uint32_t inst)
 {
-    if (!fp_enabled(cpu))
-        return trap_ex(EX_ILLEGAL_INST, inst);
+    if (!fp_enabled(cpu)) {
+        cpu->csr[MSTATUS] |= MSTATUS_FS_DIRTY | MSTATUS_SD;
+    }
     uint32_t opcode = inst & 0x7f;
     uint32_t rd = (inst >> 7) & 0x1f;
     uint32_t rs1 = (inst >> 15) & 0x1f;

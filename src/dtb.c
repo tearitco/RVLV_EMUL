@@ -281,6 +281,8 @@ int generate_dtb(CPU *cpu, uint64_t dram_size, uint64_t initrd_start, uint64_t i
         goto fail;
     if (prop_str(&f, "compatible", "ns16550a") < 0)
         goto fail;
+    if (prop_str(&f, "device_type", "serial") < 0)
+        goto fail;
     if (prop_str(&f, "status", "okay") < 0)
         goto fail;
     // Note: DTB only allows one "compatible" property with multiple strings

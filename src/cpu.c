@@ -11,6 +11,8 @@
                     (1ULL << 5) | (1ULL << 8) | (1ULL << 12) | (1ULL << 18) | \
                     (1ULL << 20))
 
+#define SYS_SPAWN 400
+
 static uint64_t sext(uint64_t v, int bits)
 {
     uint64_t m = 1ull << (bits - 1);
@@ -944,7 +946,7 @@ Trap cpu_execute(CPU *cpu, uint32_t inst, int ilen)
                     break;
                 }
                 uint64_t a7 = cpu->regs[17];
-                if (cpu->priv != PRIV_M && a7 < 0x100000) {
+                if (cpu->priv != PRIV_M && a7 == SYS_SPAWN) {
                     uint64_t ret = syscall_handle(cpu, a7, cpu->regs[10], cpu->regs[11],
                                                   cpu->regs[12], cpu->regs[13],
                                                   cpu->regs[14], cpu->regs[15],
