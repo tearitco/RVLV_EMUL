@@ -84,7 +84,7 @@ poweroff -f
 EOF
 # (copy /tmp/start.sh into the rootfs as /sbin/start, then)
 build/main --linux -k kernel/Image -f rootfs.ext2 \
-  --max-inst 200000000 --bootargs "console=ttyS0,115200n8 earlycon root=/dev/vda rw rootwait init=/sbin/start"
+  --max-inst 50000000000 --bootargs "console=ttyS0,115200n8 earlycon root=/dev/vda rw rootwait init=/sbin/init"
 ```
 
 Expected dmesg lines:
@@ -138,12 +138,9 @@ also stop the emulator.
 
 ## Status / roadmap
 
-- **Linux boot (S-mode + SBI + generated DTB):** works to userspace. See
-  [`docs/RVEM_LINUX_BOOT_NOTES.md`](docs/RVEM_LINUX_BOOT_NOTES.md) for the root
-  causes that were fixed (FPU `FS=Off` SIGILL, non-M `ecall` interception, UART
-  DT node) and the kernel `.config` changes needed (`CONFIG_FPU`, `BINFMT_ELF`,
-  TTY/SERIAL/EXT4/VIRTIO/9P).
-- **Interactive serial console:** WIP — the ttyS0 console line does not register
-  on the root-level UART DT node yet. Use `/dev/kmsg` (visible in dmesg) to
-  observe userspace output in the meantime.
+- **Linux boot (S-mode + SBI + generated DTB):** Fully working. Linux 6.18.7
+  boots to `buildroot login:` prompt with ttyS0 console, virtio block, ext4,
+  and FPU. See [docs/RVEM_LINUX_BOOT_NOTES.md](docs/RVEM_LINUX_BOOT_NOTES.md)
+  for root causes fixed (kernel image header magic offset, SBI PMU extension,
+  FPU `FS=Off` SIGILL, non-M `ecall` interception, UART DT node).
 - **Built-in `--selftest` and bare-metal tests:** passing.
