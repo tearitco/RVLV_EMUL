@@ -28,6 +28,7 @@
 #define SBI_EXT_RFENCE               0x52464E43ULL
 #define SBI_EXT_HSM                  0x48534DULL
 #define SBI_EXT_SRST                 0x53525354ULL
+#define SBI_EXT_PMU                  0x504D55ULL
 
 static void sbi_ret(CPU *cpu, int64_t err, uint64_t value)
 {
@@ -108,7 +109,7 @@ int sbi_ecall(CPU *cpu)
         case 3: {
             uint64_t ext = a0;
             int have = ext == SBI_EXT_BASE || ext == SBI_EXT_TIME || ext == SBI_EXT_IPI ||
-                       ext == SBI_EXT_RFENCE || ext == SBI_EXT_HSM || ext == SBI_EXT_SRST ||
+                       ext == SBI_EXT_RFENCE || ext == SBI_EXT_HSM || ext == SBI_EXT_SRST || ext == SBI_EXT_PMU ||
                        ext <= 8;
             sbi_ret(cpu, SBI_SUCCESS, have ? 1 : 0);
             return 1;
@@ -161,6 +162,9 @@ int sbi_ecall(CPU *cpu)
         cpu->halt = 1;
         cpu->halt_code = 0;
         sbi_ret(cpu, SBI_SUCCESS, 0);
+        return 1;
+    case SBI_EXT_PMU:
+        sbi_ret(cpu, SBI_ERR_NOT_SUPPORTED, 0);
         return 1;
     default:
         return 0;

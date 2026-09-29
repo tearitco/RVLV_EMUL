@@ -119,7 +119,7 @@ Trap check_interrupts(CPU *cpu, bool for_wfi)
 
     // DEBUG: Print timer state
     static int timer_debug_count = 0;
-    if (++timer_debug_count % 1000000 == 0) {
+    if (cpu->trace_trap && ++timer_debug_count % 1000000 == 0) {
         printf("[DEBUG] mtime=%lu mtimecmp=%lu mip=%lx mie=%lx mideleg=%lx menvcfg=%lx priv=%d\n",
                cpu->bus.clint.mtime, cpu->bus.clint.mtimecmp,
                cpu->csr[MIP], cpu->csr[MIE], cpu->csr[MIDELEG], cpu->csr[MENVCFG], cpu->priv);

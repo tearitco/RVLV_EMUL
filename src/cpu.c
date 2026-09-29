@@ -1278,10 +1278,12 @@ int load_image(CPU *cpu, const char *path, uint64_t default_addr, uint64_t *entr
             }
         }
     } else {
-        if (size >= 56) {
+        if (size >= 60) {
             uint32_t magic;
             memcpy(&magic, buf + 48, 4);
-            if (magic == 0x05435352u) {
+            uint32_t magic2;
+            memcpy(&magic2, buf + 56, 4);
+            if (magic == 0x05435352u || magic2 == 0x05435352u) {
                 uint64_t text_off;
                 memcpy(&text_off, buf + 8, 8);
                 dest = DRAM_BASE + text_off;
