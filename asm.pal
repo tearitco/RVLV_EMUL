@@ -1,0 +1,106 @@
+# asm.pal - RISC-V RV32I Instruction Encoder
+# Encodes RISC-V machine code using prisc+x R-type arithmetic
+# Verifies encoding of all major RISC-V instruction formats.
+
+# === R-type: add x1, x2, x3 ===
+# funct7=0, rs2=3, rs1=2, funct3=0, rd=1, opcode=0x33
+# = 0 | 3<<20 | 2<<15 | 0 | 1<<7 | 0x33 = 0x003100B3 = 3211443
+
+li x1, 3
+slli x1, x1, 20
+li x2, 2
+slli x2, x2, 15
+add x3, x1, x2
+addi x3, x3, 128
+addi x3, x3, 51
+builtin_out x3
+
+# === R-type: sub x4, x5, x6 ===
+# funct7=0x20=32, rs2=6, rs1=5, funct3=0, rd=4, opcode=0x33
+# = 32<<25 | 6<<20 | 5<<15 | 0 | 4<<7 | 0x33 = 0x40628233 = 1080197683
+
+li x1, 32
+slli x1, x1, 25
+li x2, 6
+slli x2, x2, 20
+add x3, x1, x2
+li x4, 5
+slli x4, x4, 15
+add x3, x3, x4
+li x4, 4
+slli x4, x4, 7
+add x3, x3, x4
+addi x3, x3, 51
+builtin_out x3
+
+# === I-type: addi x7, x8, 42 ===
+# imm=42, rs1=8, funct3=0, rd=7, opcode=0x13
+# = 42<<20 | 8<<15 | 0 | 7<<7 | 0x13 = 0x02A40393 = 44303251
+
+li x1, 42
+slli x1, x1, 20
+li x2, 8
+slli x2, x2, 15
+add x3, x1, x2
+li x4, 7
+slli x4, x4, 7
+add x3, x3, x4
+addi x3, x3, 19
+builtin_out x3
+
+# === I-type: andi x9, x10, 15 ===
+# imm=15, rs1=10, funct3=7, rd=9, opcode=0x13
+# = 15<<20 | 10<<15 | 7<<12 | 9<<7 | 0x13 = 0x00F57493 = 16086163
+
+li x1, 15
+slli x1, x1, 20
+li x2, 10
+slli x2, x2, 15
+add x3, x1, x2
+addi x3, x3, 28672
+li x4, 9
+slli x4, x4, 7
+add x3, x3, x4
+addi x3, x3, 19
+builtin_out x3
+
+# === S-type: sw x11, 4(x12) ===
+# imm=4, rs1=12, rs2=11, funct3=2, opcode=0x27
+# = 0<<25 | 11<<20 | 12<<15 | 2<<12 | 4<<7 | 0x27 = 0x00B08227 = 11567655
+
+li x1, 11
+slli x1, x1, 20
+li x2, 12
+slli x2, x2, 15
+add x3, x1, x2
+addi x3, x3, 8192
+addi x3, x3, 512
+addi x3, x3, 39
+builtin_out x3
+
+# === B-type: beq x13, x14, 8 ===
+# imm=8, rs1=13, rs2=14, funct3=0, opcode=0x63
+# = 0 | 14<<20 | 13<<15 | 0 | 2<<8 | 0x63 = 0x00E06A63 = 15106659
+
+li x1, 14
+slli x1, x1, 20
+li x2, 13
+slli x2, x2, 15
+add x3, x1, x2
+addi x3, x3, 512
+addi x3, x3, 99
+builtin_out x3
+
+# === U-type: lui x15, 0x12345 ===
+# opcode=0x37, rd=15, imm=0x12345=74565
+# = 74565<<12 | 15<<7 | 0x37 = 0x123457B7 = 305420215
+
+li x1, 74565
+slli x1, x1, 12
+li x2, 15
+slli x2, x2, 7
+add x3, x1, x2
+addi x3, x3, 55
+builtin_out x3
+
+halt

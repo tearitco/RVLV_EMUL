@@ -219,7 +219,7 @@ void handle_sigint(int sig) {
 #define NUM_SREGS 32
 #define SREG_SZ   4096
 
-typedef enum { OP_ADDI, OP_BEQ, OP_BNE, OP_LW, OP_SW, OP_JALR, OP_J, OP_HALT, OP_CUSTOM, OP_READ_HISTORY, OP_EXEC, OP_HIT_FRAME, OP_READ_STATE, OP_READ_ACTIVE_TARGET, OP_READ_ENV_KEY, OP_SLEEP, OP_READ_LAYOUT, OP_READ_POS, OP_ECALL,
+typedef enum { OP_ADDI, OP_ADD, OP_SUB, OP_ANDI, OP_ORI, OP_XORI, OP_SLLI, OP_SRLI, OP_SLL, OP_SLT, OP_SLTU, OP_XOR, OP_OR, OP_SRL, OP_SRA, OP_BEQ, OP_BNE, OP_LW, OP_SW, OP_JALR, OP_J, OP_HALT, OP_CUSTOM, OP_READ_HISTORY, OP_EXEC, OP_HIT_FRAME, OP_READ_STATE, OP_READ_ACTIVE_TARGET, OP_READ_ENV_KEY, OP_SLEEP, OP_READ_LAYOUT, OP_READ_POS, OP_ECALL,
     OP_SLIT, OP_SCPY, OP_SAPPEND, OP_SGETENV, OP_SFMT, OP_SREAD, OP_SSPLIT,
     OP_SFIND, OP_SLEN, OP_SFOPEN, OP_SFAPPEND, OP_SWRITE, OP_SFCLOSE,
     OP_SBEQ, OP_SBNE, OP_STRIM, OP_SATOI } OpBase;
@@ -709,6 +709,62 @@ void parse_line(char *line, int pass) {
             if (sscanf(line, "%*s r%d, r%d, %d", &r_rd, &r_rs1, &i->imm) == 3) { i->rd = r_rd; i->rs1 = r_rs1; }
             else if (sscanf(line, "%*s x%d, x%d, %d", &i->rd, &i->rs1, &i->imm) == 3) {}
             i->op = OP_ADDI;
+        } else if (strcmp(part, "add") == 0) {
+            int r_rd, r_rs1, r_rs2;
+            if (sscanf(line, "%*s r%d, r%d, r%d", &r_rd, &r_rs1, &r_rs2) == 3) { i->rd = r_rd; i->rs1 = r_rs1; i->rs2 = r_rs2; }
+            else if (sscanf(line, "%*s x%d, x%d, x%d", &i->rd, &i->rs1, &i->rs2) == 3) {}
+            i->op = OP_ADD;
+        } else if (strcmp(part, "sub") == 0) {
+            int r_rd, r_rs1, r_rs2;
+            if (sscanf(line, "%*s r%d, r%d, r%d", &r_rd, &r_rs1, &r_rs2) == 3) { i->rd = r_rd; i->rs1 = r_rs1; i->rs2 = r_rs2; }
+            else if (sscanf(line, "%*s x%d, x%d, x%d", &i->rd, &i->rs1, &i->rs2) == 3) {}
+            i->op = OP_SUB;
+        } else if (strcmp(part, "andi") == 0) {
+            int r_rd, r_rs1;
+            if (sscanf(line, "%*s r%d, r%d, %d", &r_rd, &r_rs1, &i->imm) == 3) { i->rd = r_rd; i->rs1 = r_rs1; }
+            else if (sscanf(line, "%*s x%d, x%d, %d", &i->rd, &i->rs1, &i->imm) == 3) {}
+            i->op = OP_ANDI;
+        } else if (strcmp(part, "ori") == 0) {
+            int r_rd, r_rs1;
+            if (sscanf(line, "%*s r%d, r%d, %d", &r_rd, &r_rs1, &i->imm) == 3) { i->rd = r_rd; i->rs1 = r_rs1; }
+            else if (sscanf(line, "%*s x%d, x%d, %d", &i->rd, &i->rs1, &i->imm) == 3) {}
+            i->op = OP_ORI;
+        } else if (strcmp(part, "xori") == 0) {
+            int r_rd, r_rs1;
+            if (sscanf(line, "%*s r%d, r%d, %d", &r_rd, &r_rs1, &i->imm) == 3) { i->rd = r_rd; i->rs1 = r_rs1; }
+            else if (sscanf(line, "%*s x%d, x%d, %d", &i->rd, &i->rs1, &i->imm) == 3) {}
+            i->op = OP_XORI;
+        } else if (strcmp(part, "slli") == 0) {
+            int r_rd, r_rs1;
+            if (sscanf(line, "%*s r%d, r%d, %d", &r_rd, &r_rs1, &i->imm) == 3) { i->rd = r_rd; i->rs1 = r_rs1; }
+            else if (sscanf(line, "%*s x%d, x%d, %d", &i->rd, &i->rs1, &i->imm) == 3) {}
+            i->op = OP_SLLI;
+        } else if (strcmp(part, "srli") == 0) {
+            int r_rd, r_rs1;
+            if (sscanf(line, "%*s r%d, r%d, %d", &r_rd, &r_rs1, &i->imm) == 3) { i->rd = r_rd; i->rs1 = r_rs1; }
+            else if (sscanf(line, "%*s x%d, x%d, %d", &i->rd, &i->rs1, &i->imm) == 3) {}
+            i->op = OP_SRLI;
+        } else if (strcmp(part, "sll") == 0) {
+            sscanf(line, "%*s x%d, x%d, x%d", &i->rd, &i->rs1, &i->rs2);
+            i->op = OP_SLL;
+        } else if (strcmp(part, "slt") == 0) {
+            sscanf(line, "%*s x%d, x%d, x%d", &i->rd, &i->rs1, &i->rs2);
+            i->op = OP_SLT;
+        } else if (strcmp(part, "sltu") == 0) {
+            sscanf(line, "%*s x%d, x%d, x%d", &i->rd, &i->rs1, &i->rs2);
+            i->op = OP_SLTU;
+        } else if (strcmp(part, "xor") == 0) {
+            sscanf(line, "%*s x%d, x%d, x%d", &i->rd, &i->rs1, &i->rs2);
+            i->op = OP_XOR;
+        } else if (strcmp(part, "or") == 0) {
+            sscanf(line, "%*s x%d, x%d, x%d", &i->rd, &i->rs1, &i->rs2);
+            i->op = OP_OR;
+        } else if (strcmp(part, "srl") == 0) {
+            sscanf(line, "%*s x%d, x%d, x%d", &i->rd, &i->rs1, &i->rs2);
+            i->op = OP_SRL;
+        } else if (strcmp(part, "sra") == 0) {
+            sscanf(line, "%*s x%d, x%d, x%d", &i->rd, &i->rs1, &i->rs2);
+            i->op = OP_SRA;
         } else if (strcmp(part, "beq") == 0) {
             int r_rs1, r_rs2;
             if (sscanf(line, "%*s r%d, r%d, %s", &r_rs1, &r_rs2, i->label_ref) == 3) { i->rs1 = r_rs1; i->rs2 = r_rs2; }
@@ -886,6 +942,8 @@ void save_mem(const char *path) {
 #define SYS_WRITE_LINE 3  /* ecall "text", x15=3, x12=fd -> x12=bytes written or -1 */
 #define SYS_WRITE_INT  4  /* x15=4, x12=fd, x13=value -> x12=bytes written or -1 (writes "%d\n") */
 #define SYS_READ_INT   5  /* x15=5, x12=fd -> x12=parsed int (atoi of next line), or -1 at EOF */
+#define SYS_WRITE_MEM  8  /* x15=8, x12=fd, x13=addr, x14=count -> x12=bytes written (writes raw bytes from mem[]) */
+#define SYS_EXIT       9  /* x15=9, x10=code -> halts VM with exit code */
 /* SYS_GET_KV_INT/SYS_SET_KV_INT - added while prototyping the first
  * real op conversion (see PAL-VS-C-ARCHITECTURE.txt sec. 4/6): almost
  * every real op in this family (pet_pet.c/feed_pet.c/move_player.c/
@@ -909,6 +967,12 @@ void save_mem(const char *path) {
 
 #define MAX_ECALL_FDS 8
 static FILE *ecall_fds[MAX_ECALL_FDS] = {0};
+
+void init_ecall_fds(void) {
+    ecall_fds[0] = stdin;
+    ecall_fds[1] = stdout;
+    ecall_fds[2] = stderr;
+}
 
 static int ecall_alloc_fd(FILE *f) {
     for (int i = 0; i < MAX_ECALL_FDS; i++) {
@@ -1003,6 +1067,35 @@ void exec_ecall(Inst *i) {
             if (!found) fprintf(f, "%s=%d\n", i->literal_arg2, value);
             fclose(f);
             regs[12] = 1;
+            break;
+        }
+        case SYS_WRITE_MEM: {
+            int fd = regs[12];
+            int addr = regs[13];
+            int count = regs[14];
+            if (fd >= 0 && fd < MAX_ECALL_FDS && ecall_fds[fd]) {
+                uint8_t buf[4096];
+                int written = 0;
+                while (written < count && written < 4096) {
+                    int cell = addr + written / 4;
+                    int bo = (addr + written) % 4;
+                    if (cell < 0 || cell >= MEM_SIZE) break;
+                    if (bo + count - written > 4) {
+                        memcpy(buf + written, (uint8_t*)&mem[cell] + bo, 4 - bo);
+                        written += 4 - bo;
+                    } else {
+                        memcpy(buf + written, (uint8_t*)&mem[cell] + bo, count - written);
+                        written = count;
+                    }
+                }
+                regs[12] = (int)fwrite(buf, 1, written, ecall_fds[fd]);
+                fflush(ecall_fds[fd]);
+            } else regs[12] = -1;
+            break;
+        }
+        case SYS_EXIT: {
+            inst_count = 0;
+            regs[12] = 0;
             break;
         }
         default: regs[12] = -1; break;
@@ -1119,6 +1212,8 @@ int main(int argc, char **argv) {
     
     /* Set up Ctrl+C handler */
     signal(SIGINT, handle_sigint);
+    
+    init_ecall_fds();
     
     /* Try local first, then relative to binary */
     FILE *base_check = fopen("default_op.txt", "r");
@@ -1456,6 +1551,20 @@ int main(int argc, char **argv) {
         } else {
             switch (i.op) {
                 case OP_ADDI: regs[i.rd] = regs[i.rs1] + i.imm; break;
+                case OP_ADD: regs[i.rd] = regs[i.rs1] + regs[i.rs2]; break;
+                case OP_SUB: regs[i.rd] = regs[i.rs1] - regs[i.rs2]; break;
+                case OP_ANDI: regs[i.rd] = regs[i.rs1] & i.imm; break;
+                case OP_ORI: regs[i.rd] = regs[i.rs1] | i.imm; break;
+                case OP_XORI: regs[i.rd] = regs[i.rs1] ^ i.imm; break;
+                case OP_SLLI: regs[i.rd] = regs[i.rs1] << i.imm; break;
+                case OP_SRLI: regs[i.rd] = (uint32_t)regs[i.rs1] >> i.imm; break;
+                case OP_SLL: regs[i.rd] = regs[i.rs1] << (regs[i.rs2] & 0x1F); break;
+                case OP_SLT: regs[i.rd] = (regs[i.rs1] < regs[i.rs2]) ? 1 : 0; break;
+                case OP_SLTU: regs[i.rd] = ((uint32_t)regs[i.rs1] < (uint32_t)regs[i.rs2]) ? 1 : 0; break;
+                case OP_XOR: regs[i.rd] = regs[i.rs1] ^ regs[i.rs2]; break;
+                case OP_OR: regs[i.rd] = regs[i.rs1] | regs[i.rs2]; break;
+                case OP_SRL: regs[i.rd] = (uint32_t)regs[i.rs1] >> (regs[i.rs2] & 0x1F); break;
+                case OP_SRA: regs[i.rd] = regs[i.rs1] >> (regs[i.rs2] & 0x1F); break;
                 case OP_BEQ: {
                     int target = -1;
                     for (int l = 0; l < label_count; l++)
