@@ -1,0 +1,137 @@
+================================================================================
+RVLV_EMUL - GENERAL ONBOARDING
+================================================================================
+
+If you're reading this, you're likely taking over or assisting with the
+RVLV_EMUL project. This file contains the essential information to get
+you up to speed quickly.
+
+--------------------------------------------------------------------------------
+1. WHAT IS RVLV_EMUL
+--------------------------------------------------------------------------------
+
+RVLV_EMUL is an in-house project building a self-hosting RISC-V software stack
+from the ground up. It includes:
+
+- rvemu: A complete RISC-V RV64 emulator (ISA, MMU, SBI, PCIe, virtio, CLINT,
+  PLIC, UART, etc.) - src/
+- prisc+x: A VM that runs .pal assembly scripts - 0.hdl0+prisc-bootstrap/
+- prisc_bare: Bare-metal prisc+x VM for RISC-V hardware - src/prisc_bare.c
+- Buildroot Linux: Full Linux userspace running on rvemu
+- Minimal Linux kernel config (kernel/.config)
+- Bootstrap toolchain: musl cross-compiled for RISC-V, buildroot toolchain
+
+The end goal: A fully bootstrapped C compiler written in .pal that can
+compile its own source, producing a self-hosting stack.
+
+--------------------------------------------------------------------------------
+2. KEY COMMANDS
+--------------------------------------------------------------------------------
+
+Build rvemu:
+    cd RVLV_EMUL && ./build.sh
+
+Run rvemu self-test:
+    ./build/main --selftest
+
+Run prisc+x (Linux mode):
+    gcc -o prisc_x 0.hdl0+prisc-bootstrap/prisc+x.c && ./prisc_x test.pal
+
+Run prisc+bare (on rvemu):
+    buildroot/output/host/bin/riscv64-buildroot-linux-gnu-gcc \
+      -nostdlib -static -mcmodel=medany -T bare.ld \
+      -o prisc_x_bare.elf src/prisc_bare.c
+    ./build/main -k prisc_x_bare.elf --max-inst 10000000
+
+Quick reference: see CHECKLIST.md for the full task status
+
+--------------------------------------------------------------------------------
+3. DIRECTORY OVERVIEW
+--------------------------------------------------------------------------------
+
+RVLV_EMUL/
+  src/                    - rvemu source (cpu, trap, csr, virtio, uart, ...)
+  src/prisc_bare.c        - Bare-metal prisc+x VM (runs on RISC-V)
+  src/bare_test.c         - Bare-metal test program
+  main.c                  - rvemu entry point
+  build.sh                - Build rvemu
+  build/                  - rvemu binary + build artifacts
+  buildroot/              - Buildroot Linux (Linux 6.18.7 + toolchain)
+  kernel/                 - Minimal Linux kernel config
+  xv6-riscv/              - xv6 teaching OS (optional test target)
+  musl-build/             - musl libc cross-compiled for RISC-V
+  0.hdl0+prisc-bootstrap/ - prisc+x Linux VM + .pal files
+    prisc+x.c             - Main prisc+x VM
+    asm.pal               - RISC-V assembler in .pal (Phase 3)
+    asm_test.pal          - Encoding verification tests
+  docs/                   - Architecture docs, decisions
+  tests/                  - RISC-V binary test fixtures
+  rezip-rvem.sh           - Emergency backup script
+  CHECKLIST.md            - Master task checklist
+  PROGRESS_REPORT.md      - Latest progress summary
+  ROADMAP.md              - Phase 3-4 roadmap
+  compaction.md           - Current handoff notes
+  TODO.md                 - TODO list
+
+--------------------------------------------------------------------------------
+4. CRITICAL: DO NOT TOUCH XO.SFPGA.NN/
+--------------------------------------------------------------------------------
+
+>>> There is a SEPARATE, INDEPENDENT PROJECT directory: XO.SFPGA.NN/ <<<
+>>> This is for the discrete 7400-series FPGA emulator project. <<<
+>>> DO NOT modify files in XO.SFPGA.NN/ - it belongs to a different agent. <<<
+
+The SFPGA agent has its own work tree, roadmap, and skill file.
+They have already committed their work and created:
+  - .kilo/skills/sfpga/SKILL.md
+
+If you need to coordinate with the SFPGA agent, use the shared board.
+Otherwise, treat XO.SFPGA.NN/ as read-only from your perspective.
+
+--------------------------------------------------------------------------------
+5. CURRENT STATUS & NEXT ACTIONS
+--------------------------------------------------------------------------------
+
+STATUS:
+- Phase 1 (rvemu foundation): COMPLETE
+- Phase 1b (minimal Linux kernel): COMPLETE
+- Phase 2 (prisc+x on rvemu): COMPLETE
+- Phase 3 (bootstrap tools): IN PROGRESS - starting with RISC-V assembler
+
+NEXT ACTION:
+- Build the RISC-V assembler in .pal syntax (0.hdl0+prisc-bootstrap/asm.pal)
+- This is the first self-hosting tool: .pal code that emits ELF binaries
+- Target: run on prisc_x_bare.elf, produce valid RISC-V ELF
+- Est. time: 2-4 hours for initial implementation
+
+Key details for the assembler:
+- Must emit ELF64-riscv (little-endian, RV64I/ADDI/JAL/BEQ/LW/SW)
+- Two-pass: pass 1 = labels, pass 2 = codegen
+- Output to file (the existing string-write primitive can't emit NUL bytes
+  safely, so you may need a raw-file-write syscall)
+- Test with: readelf, objdump, and running on ./build/main
+
+--------------------------------------------------------------------------------
+6. SKILLS (for Kilo agents)
+--------------------------------------------------------------------------------
+
+The project has two agent skills configured:
+  .kilo/skills/rvlv-emul/SKILL.md  - Main RVLV_EMUL bootstrap
+  .kilo/skills/sfpga/SKILL.md      - SFPGA FPGA emulator
+
+Load the correct skill before starting work.
+
+--------------------------------------------------------------------------------
+7. COMMUNICATION
+--------------------------------------------------------------------------------
+
+If you encounter issues, check:
+- compaction.md for current handoff notes
+- INVESTIGATION_REPORT.md for known issues (e.g., Buildroot SIGILL in dynamic linker)
+- PROGRESS_REPORT.md for recent status
+
+For coordination with other agents:
+- Use the shared Kilo board
+- Tag PRs with the appropriate label
+
+================================================================================
