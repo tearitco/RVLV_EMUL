@@ -1,0 +1,55 @@
+# SFPGA Agent - Quick Start Guide
+
+## How to Use This Guide
+Point any new agent to this file: `/home/jb/Desktop/ele-desk+cal/1.RVEM/RVLV_EMUL/XO.SFPGA.NN/sfpga-prompt-index.txt`
+
+## Spawn Directory
+**Always work in**: `/home/jb/Desktop/ele-desk+cal/1.RVEM/RVLV_EMUL/XO.SFPGA.NN/`
+
+This is where all FPGA emulator development happens. Do NOT work in the parent repo directories.
+
+## Key Files (in order of importance)
+
+1. **`sfpga-prompt-index.txt`** (this file) - You are here
+2. **`architecture.md`** - Full architecture: IC specs, LUT design, bitstream format
+3. **`ROADMAP.md`** - Phase-by-phase plan with tasks and acceptance criteria
+4. **`INTEGRATION.md`** - How to connect to rvemu (MMIO bridge, syscalls, soft-core)
+5. **`S.FPGA.nn.plan.txt`** - Original vision/plan from the user
+
+## Source Code Structure
+```
+XO.SFPGA.NN/
+  include/           - C headers (fpga.h, bitstream.h)
+  src/               - C implementations (fpga.c, bitstream.c, tests)
+  hdl0/              - HDL0 hardware description files
+  test/              - Test scripts
+```
+
+## Build & Test
+```bash
+# Compile and run tests
+cd XO.SFPGA.NN
+gcc -Wall -Wextra -Iinclude -Isrc -o /tmp/fpga_test src/fpga.c src/bitstream.c src/fpga_test.c
+/tmp/fpga_test
+
+# Or use the test script
+bash test/test_fpga.sh
+```
+
+## Current State
+- **Phase 1**: FPGA emulator core is implemented (LUTs, registers, switch box)
+- **Phase 2**: HDL0 compiler stubs are defined (parser not implemented)
+- **Phase 3+**: Integration and soft-core development pending
+- All code compiles and passes basic LUT/AND-gate tests
+
+## Conventions
+- Use HDL0 as primary HDL (not Verilog)
+- C code compiles with `gcc -Wall -Wextra`
+- No external dependencies beyond libc
+- Bitstream format documented in architecture.md
+- All work confined to `XO.SFPGA.NN/` directory
+
+## Communication
+- Use the shared board (`main` channel) for coordination with rvemu agents
+- Tag GitHub PRs with `sfpga`
+- The skill file is at: `.kilo/skills/sfpga/SKILL.md` (relative to repo root)
