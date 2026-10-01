@@ -1,0 +1,33 @@
+
+
+
+
+
+
+
+i want to make an fpga (lut style circuit board) 
+emulator 
+
+i realize real fpgas have proprietary systems preventing them from being interacted with
+transparently because bitstreams. 
+
+
+we are going to make our own general purpose bitstream format using what is known
+about the most open bitstreams. 
+
+
+
+heres what we do "finsish fpga emulator in .c " 
+
+it can consume "HDL0" or verilog , using a simple verilog compiler we will make, in pure c
+
+we will make a PNR code .c 
+
+we will use our bitstream, put it on our fpga , and make some simple 
+emulated output signals to make sure everything is ok. 
+
+then maybe ideally we can also bootstrap a riscv emulator in hardware on here, get it? 
+we dont have to stop and do this in full, but i just want to make plans and code stubs in here
+it should all be pure c or hdl0 or priscv , and u should suggest how our rvem pipeline
+can interact, be useful as testing tools etc. just layout the roadmap , stubs
+and add this 2 push , and emergency .7z file (and lets do a fresh zip)

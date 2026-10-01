@@ -1,0 +1,14 @@
+# Virtual UART peripheral for FPGA <-> rvemu communication
+# 8-bit transmit/receive using tristate buffers (74HC125/126)
+
+.LUT uart_tx_start [tx_en, clk_div_0, clk_div_1, clk_div_2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT uart_tx_bitcnt [tx_start, clk_div_0, clk_div_1, clk_div_2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT uart_tx_shift [tx_data, bitcnt0, bitcnt1, bitcnt2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+
+.LUT uart_rx_shift [rx_in, clk_div_0, clk_div_1, clk_div_2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT uart_rx_bitcnt [rx_in, clk_div_0, clk_div_1, clk_div_2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT uart_rx_data [rx_shift, rx_bitcnt_0, rx_bitcnt_1, rx_bitcnt_2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+
+.PIN uart_rx = uart_rx_data.out
+.PIN uart_tx = uart_tx_shift.out
+.PIN uart_tx_ready = tx_bitcnt_eq_0

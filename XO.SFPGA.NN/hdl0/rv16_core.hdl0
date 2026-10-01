@@ -1,0 +1,23 @@
+# rv16 soft-core instruction set (16-bit subset of RISC-V RV32I)
+# Uses LUTs for instruction decode and register file
+
+# Instruction format (16-bit):
+# [15:12] opcode, [11:10] rd, [9:7] funct3/imm, [6:5] rs1, [4:2] rs2, [1:0] reg/immed
+
+.LUT decode_op_add [instr15, instr14, instr13, instr12] = {0,1,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0}
+.LUT decode_op_sub [instr15, instr14, instr13, instr12] = {0,1,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0}
+.LUT decode_op_load [instr15, instr14, instr13, instr12] = {0,0,1,0, 0,0,0,0, 0,0,0,0, 0,0,0,0}
+.LUT decode_op_store [instr15, instr14, instr13, instr12] = {0,1,1,0, 0,0,0,0, 0,0,0,0, 0,0,0,0}
+.LUT decode_op_branch [instr15, instr14, instr13, instr12] = {0,0,0,1, 0,0,0,0, 0,0,0,0, 0,0,0,0}
+.LUT decode_op_jal [instr15, instr14, instr13, instr12] = {0,0,1,0, 0,0,0,0, 0,0,0,0, 0,0,0,0}
+
+# Register file (8 registers x 16 bits = 128 bits of LUT storage)
+.LUT regfile_0 [decode_wr, wr_addr0, wr_addr1, wr_addr2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT regfile_1 [decode_wr, wr_addr0, wr_addr1, wr_addr2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT regfile_2 [decode_wr, wr_addr0, wr_addr1, wr_addr2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT regfile_3 [decode_wr, wr_addr0, wr_addr1, wr_addr2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+
+.PIN rv16_out0 = alu_result_0
+.PIN rv16_out1 = alu_result_1
+.PIN rv16_out2 = alu_result_2
+.PIN rv16_out3 = alu_result_3

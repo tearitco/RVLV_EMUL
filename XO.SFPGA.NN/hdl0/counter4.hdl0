@@ -1,0 +1,14 @@
+# 4-bit counter using LUT4 cascaded via carry chain
+# Each LUT computes next_bit = current_bit + carry_in
+
+.LUT lut0 [in0, carry_in] = {0,1,0,1,0,1,0,1,1,0,1,0,1,0,1,0}
+.LUT lut1 [lut0.out, carry_in] = {0,1,0,1,0,1,0,1,1,0,1,0,1,0,1,0}
+.LUT lut2 [lut1.out, carry_in] = {0,1,0,1,0,1,0,1,1,0,1,0,1,0,1,0}
+.LUT lut3 [lut2.out, carry_in] = {0,1,0,1,0,1,0,1,1,0,1,0,1,0,1,0}
+
+.CONFIG clk_div = 100000  ; divide system clock for visible counting
+
+.PIN out0 = lut0.out
+.PIN out1 = lut1.out
+.PIN out2 = lut2.out
+.PIN out3 = lut3.out

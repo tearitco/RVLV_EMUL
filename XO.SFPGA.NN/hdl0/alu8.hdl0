@@ -1,0 +1,21 @@
+# 8-bit ALU supporting add, sub, and, or, xor, slt
+# Uses 4-LUT for function decode + carry chain for arithmetic
+
+.LUT alu_c0 [rs0b0, fn0, fn1, fn2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT alu_c1 [rs0b1, fn0, fn1, fn2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT alu_c2 [rs0b2, fn0, fn1, fn2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT alu_c3 [rs0b3, fn0, fn1, fn2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT alu_c4 [rs0b4, fn0, fn1, fn2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT alu_c5 [rs0b5, fn0, fn1, fn2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT alu_c6 [rs0b6, fn0, fn1, fn2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT alu_c7 [rs0b7, fn0, fn1, fn2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+
+.PIN alu_out0 = alu_c0.out
+.PIN alu_out1 = alu_c1.out
+.PIN alu_out2 = alu_c2.out
+.PIN alu_out3 = alu_c3.out
+.PIN alu_out4 = alu_c4.out
+.PIN alu_out5 = alu_c5.out
+.PIN alu_out6 = alu_c6.out
+.PIN alu_out7 = alu_c7.out
+.PIN alu_carry = carry_chain.out
