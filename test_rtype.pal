@@ -1,0 +1,64 @@
+# test_rtype.pal - Verify all R-type operations
+# Tests: ADD, SUB, ANDI, ORI, XORI, SLLI, SRLI, SLL, SLT, SLTU, XOR, OR, SRL, SRA
+
+int x1, 15
+int x2, 3
+int x3, 0
+
+# Test ADD: x3 = x1 + x2 = 15 + 3 = 18
+add x3, x1, x2
+builtin_out x3
+
+# Test SUB: x3 = x1 - x2 = 15 - 3 = 12
+sub x3, x1, x2
+builtin_out x3
+
+# Test ANDI: x3 = x1 & 3 = 15 & 3 = 3
+andi x3, x1, 3
+builtin_out x3
+
+# Test ORI: x3 = x1 | 8 = 15 | 8 = 15
+ori x3, x1, 8
+builtin_out x3
+
+# Test XORI: x3 = x1 ^ 1 = 15 ^ 1 = 14
+xori x3, x1, 1
+builtin_out x3
+
+# Test SLLI: x3 = x1 << 2 = 15 << 2 = 60
+slli x3, x1, 2
+builtin_out x3
+
+# Test SRLI: x3 = x1 >> 2 = 15 >> 2 = 3 (unsigned)
+srli x3, x1, 2
+builtin_out x3
+
+# Test SLL: x3 = x1 << x2 = 15 << 3 = 120
+sll x3, x1, x2
+builtin_out x3
+
+# Test SLT: x3 = (x2 < x1) ? 1 : 0 = (3 < 15) ? 1 : 0 = 1
+slt x3, x2, x1
+builtin_out x3
+
+# Test SLTU: x3 = (x2 < x1) ? 1 : 0 = 1
+sltu x3, x2, x1
+builtin_out x3
+
+# Test XOR: x3 = x1 ^ x2 = 15 ^ 3 = 12
+xor x3, x1, x2
+builtin_out x3
+
+# Test OR: x3 = x1 | x2 = 15 | 3 = 15
+or x3, x1, x2
+builtin_out x3
+
+# Test SRL: x3 = x1 >> x2 = 15 >> 3 = 1 (unsigned)
+srl x3, x1, x2
+builtin_out x3
+
+# Test SRA: x3 = x1 >> x2 = 15 >> 3 = 1 (arithmetic, same for positive)
+sra x3, x1, x2
+builtin_out x3
+
+halt

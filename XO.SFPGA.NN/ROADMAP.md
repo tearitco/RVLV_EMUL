@@ -145,4 +145,7 @@ FPGA Chip A ←→ [WiFi-SDR Emulator] ←→ TCP/IP ←→ [WiFi-SDR Emulator] 
 - Phase 5 depends on Phase 4
 
 ## Current Status
-Phase 1: Started (this commit includes architecture.md and ROADMAP.md)
+Phase 1: Implemented — FPGA emulator core (`fpga.c`) compiles with 18/18 test cases passing.
+Phase 2: Implemented — HDL0 compiler (`pnr.c`) compiles `.hdl0` → `.bit` format.
+Verilog-to-HDL0 compiler (`verilog.c`) compiles a simple Verilog subset to HDL0 text.
+Full pipeline tested: Verilog → HDL0 → bitstream → FPGA simulation.

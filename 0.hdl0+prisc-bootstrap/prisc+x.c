@@ -420,8 +420,8 @@ int parse_vars_line(char *line) {
     if (line[0] == '#' || line[0] == '\0') return 0;
     if (strncmp(line, "#include", 8) == 0) return 0;
     
-    char name[32], type[16], value[128];
-    if (sscanf(line, "%31s %15s %127[^\n]", name, type, value) == 3) {
+    char type[16], name[32], value[128];
+    if (sscanf(line, "%15s %31[^,\n]%*c %127[^\n]", type, name, value) == 3) {
         add_variable(name, type, value);
         return 1;
     }
@@ -435,8 +435,8 @@ int is_variable_line(char *line) {
     if (trimmed[0] == '#' || trimmed[0] == '\0') return 0;
     if (strncmp(trimmed, "#include", 8) == 0) return 0;
     
-    char name[32], type[16], value[128];
-    if (sscanf(trimmed, "%31s %15s %127[^\n]", name, type, value) == 3) {
+    char type[16], name[32], value[128];
+    if (sscanf(trimmed, "%15s %31[^,\n]%*c %127[^\n]", type, name, value) == 3) {
         if (strcmp(type, "int") == 0 || strcmp(type, "char") == 0 || 
             strcmp(type, "string") == 0 || strcmp(type, "array") == 0) {
             return 1;
@@ -1279,20 +1279,28 @@ int main(int argc, char **argv) {
         trimmed[sizeof(trimmed) - 1] = '\0';
         trim(trimmed);
         if (is_variable_line(trimmed)) {
-            char name[32], type[16], value[256];
-            if (sscanf(trimmed, "%31s %15s %255[^\n]", name, type, value) == 3) {
+            char type[16], name[32], value[256];
+            if (sscanf(trimmed, "%15s %31[^,\n]%*c %255[^\n]", type, name, value) == 3) {
                 add_variable(name, type, value);
             }
         }
     }
     
+    /* Load variable initial values into registers: int x1, 42 → regs[1] = 42 */
+    for (int v = 0; v < var_count; v++) {
+        int regidx;
+        if (sscanf(variables[v].name, "x%d", &regidx) == 1 && regidx > 0 && regidx < 16) {
+            regs[regidx] = variables[v].value;
+        }
+    }
+
     rewind(f);
     inst_count = 0;
-    
+
     while (fgets(line, sizeof(line), f)) parse_line(line, 1);
     rewind(f);
     inst_count = 0;
-    
+
     while (fgets(line, sizeof(line), f)) parse_line(line, 2);
     fclose(f);
     

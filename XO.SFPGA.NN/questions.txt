@@ -1,0 +1,28 @@
+SFPGA Agent - Questions for Parent Agent
+==========================================
+
+Q1: FPGA routing model granularity
+The current fpga.c fpga_cycle() only reads clb->north.values for all LUT inputs.
+The switchbox (74HC4066/125/126) interconnect is not yet implemented. Should I:
+  (a) Implement a full 2D-mesh CLB grid with N/S/E/W bus routing per the architecture.md, or
+  (b) Use a simplified flat-wire model where LUTs reference global wire indices directly?
+
+I'm proceeding with (b) flat-wire model for a working prototype, with switchbox.c
+providing the wire-to-wire crossbar. Adjust if the parent agent prefers (a).
+
+Q2: Bitstream format - resolved vs symbolic
+The HDL0 source files use named signals (e.g. lut0.out, in0). The bitstream_entry_t
+struct has physical addressing fields (src_clb, src_lut, dst_clb, dst_lut). Should the
+PNR produce a fully-resolved bitstream (wire indices), or keep symbolic names in the
+bitstream and resolve at load time?
+
+Proceeding with fully-resolved bitstream (post-PNR physical wire indices). The PNR
+resolves HDL0 symbol names to wire indices. If the parent agent prefers a different
+approach, this is the main integration point that would need revision.
+
+Q3: Emergency .7z backup scope
+Should the emergency .7z backup use the existing rezip-rvem.sh script (full RVLV_EMUL
+repo), or create a separate backup of just the XO.SFPGA.NN directory?
+
+Proceeding with a separate XO.SFPGA.NN-specific backup, plus running the existing
+rezip-rvem.sh for the full repo. Adjust if the parent agent has different preferences.

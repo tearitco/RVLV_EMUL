@@ -144,3 +144,43 @@ also stop the emulator.
   for root causes fixed (kernel image header magic offset, SBI PMU extension,
   FPU `FS=Off` SIGILL, non-M `ecall` interception, UART DT node).
 - **Built-in `--selftest` and bare-metal tests:** passing.
+
+## XO.SFPGA.NN — Discrete 7400-Series FPGA Emulator
+
+A software FPGA emulator built from discrete 74HC-series logic ICs, modeled in C
+using HDL0 as the HDL. Lives in `XO.SFPGA.NN/`. See [XO.SFPGA.NN/architecture.md](XO.SFPGA.NN/architecture.md)
+and [XO.SFPGA.NN/ROADMAP.md](XO.SFPGA.NN/ROADMAP.md).
+
+### Toolchain
+
+| Tool | Source | Purpose |
+|---|---|---|
+| `fpga` | `XO.SFPGA.NN/src/fpga.c` | FPGA fabric simulator (LUTs, registers, switchbox) |
+| `pnr` | `XO.SFPGA.NN/src/pnr.c` | Places & routes HDL0 → bitstream |
+| `vlog` | `XO.SFPGA.NN/src/verilog.c` | Verilog subset → HDL0 compiler |
+| `counter4.hdl0` | `XO.SFPGA.NN/hdl0/` | 4-bit counter reference design |
+
+### Build & Test
+
+```bash
+cd XO.SFPGA.NN
+gcc -o /tmp/fpga src/fpga.c && /tmp/fpga --test     # 18/18 pass
+gcc -o /tmp/pnr src/pnr.c
+gcc -o /tmp/vlog src/verilog.c
+```
+
+### Pipeline
+
+```console
+$ /tmp/vlog input.v out.hdl0       # Verilog → HDL0 text
+$ /tmp/pnr out.hdl0 out.bit        # HDL0 → bitstream
+$ /tmp/fpga out.bit 10             # simulate 10 cycles
+```
+
+### Current status
+
+- **Phase 1** — FPGA core: implemented, 18 test cases passing
+- **Phase 2** — HDL0 compiler (`pnr`): implemented
+- **Phase 3** — rvemu integration: `SYS_FPGA_LOAD` syscall planned for prisc+x
+- **Phase 4** — Soft-core RISC-V (rv16): HDL0 reference written, compilation pending
+- **Phase 5** — Real hardware (ICE40): future

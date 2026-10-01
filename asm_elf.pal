@@ -1,0 +1,218 @@
+# asm_elf.pal - Self-hosting RISC-V ELF assembler for prisc+x
+# Encodes RISC-V machine code and wraps it in an ELF64 binary
+# Output: ELF64 executable loadable by rvemu
+#
+# Program: li x10, 42; li x17, 93; ecall
+# This exits with code 42 on rvemu (M-mode ecall sets a0 as exit code)
+
+# --- Phase 1: Build ELF header in mem[0..15] ---
+# mem[0] = 0x464C457F (ELF magic)
+li x1, 0x464C457F
+sw x1, 0(x0)
+addi x8, x0, 1
+
+# mem[1] = 0x00010102 (class=64bit, data=LE, version=1)
+li x1, 0x00010102
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[2] = 0 (padding)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[3] = 0 (padding)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[4] = 0x00F30002 (e_type=ET_EXEC=2, e_machine=EM_RISCV=0xF3)
+# Compute: 2 | (0xF3 << 16) = 0x00F30002
+li x1, 2
+li x2, 243
+slli x2, x2, 16
+add x3, x1, x2
+sw x3, 0(x8)
+addi x8, x8, 1
+
+# mem[5] = 0x00000001 (e_version)
+li x1, 1
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[6] = 0x80000000 (e_entry - entry point at DRAM base)
+li x1, 2147483648
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[7] = 0x00000000 (e_entry high)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[8] = 0x00000040 (e_phoff = 64 bytes)
+li x1, 64
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[9] = 0 (e_phoff high)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[10] = 0 (e_shoff)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[11] = 0 (e_shoff high)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[12] = 0 (e_flags)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[13] = 0x00380040 (e_ehsize=64=0x40, e_phentsize=56=0x38)
+# Compute: 64 | (56 << 16) = 0x00380040
+li x1, 64
+li x2, 56
+slli x2, x2, 16
+add x3, x1, x2
+sw x3, 0(x8)
+addi x8, x8, 1
+
+# mem[14] = 0x00400001 (e_phnum=1, e_shentsize=64=0x40)
+# Compute: 1 | (64 << 8) | (0 << 16) | (64 << 16)
+# Actually: e_phnum at bits 0-15 of the word starting at offset 54
+# Let me recompute: offset 54 = e_phnum(2) + e_shentsize(2) + e_shnum(2) + e_shstrndx(2) = 8 bytes
+# At mem[14] (offset 56-59): contains e_phnum(1) | (e_shentsize(64) << 16) | (e_shnum(0) << ...) 
+# Wait - bytes 54-55 = e_phentsize=56, bytes 56-57 = e_phnum=1, bytes 58-59 = e_shentsize=64
+# So word at offset 52 (mem[13]) has: e_flags[4] + e_ehsize[2] + e_phentsize[2] = 0 + 64 + 56<<16
+# Word at offset 56 (mem[14]) has: e_phnum[2] + e_shentsize[2] + e_shnum[2] + e_shstrndx[2]
+# = 1 | (64<<16) | (0<<...) = 0x00400001
+li x1, 1
+li x2, 64
+slli x2, x2, 16
+add x3, x1, x2
+sw x3, 0(x8)
+addi x8, x8, 1
+
+# mem[15] = 0 (e_shnum=0, e_shstrnxd=0)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# --- Phase 2: Build program header in mem[16..29] ---
+# Total header size = 64 + 56 = 120 = 0x78, so text starts at offset 120
+
+# mem[16] = 0x00000001 (p_type = PT_LOAD)
+li x1, 1
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[17] = 0x00000005 (p_flags = PF_R | PF_X)
+li x1, 5
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[18] = 0x00000078 (p_offset = 120)
+li x1, 120
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[19] = 0x80000000 (p_vaddr low = 0x80000000)
+li x1, 2147483648
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[20] = 0x00000000 (p_vaddr high)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[21] = 0x80000000 (p_paddr low)
+sw x1, 0(x8)  # x1 still = 2147483648
+addi x8, x8, 1
+
+# mem[22] = 0x00000000 (p_paddr high)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[23] = 0x0000000C (p_filesz = 12 bytes)
+li x1, 12
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[24] = 0x00000000 (p_filesz high)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[25] = 0x0000000C (p_memsz = 12)
+sw x1, 0(x8)  # x1 still = 12
+addi x8, x8, 1
+
+# mem[26] = 0x00000000 (p_memsz high)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[27] = 0x00001000 (p_align = 4096)
+li x1, 4096
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[28] = 0x00000000 (p_align high)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[29] = scratch (not needed, but keep alignment)
+# p_flags is at bytes 4-7 of phdr, so word boundaries:
+# Actually, 56 bytes = 14 words. mem[16..29] = 14 words ✓
+
+# --- Phase 3: Encode RISC-V instructions in mem[30..32] ---
+
+# Instruction 0: addi x10, x0, 42 (li a0, 42)
+# 42<<20 | 10<<7 | 0x13 = 0x02A00513
+li x1, 42
+slli x1, x1, 20
+li x2, 10
+slli x2, x2, 7
+add x3, x1, x2
+addi x3, x3, 19
+sw x3, 0(x8)
+addi x8, x8, 1
+
+# Instruction 1: addi x17, x0, 93 (li a7, 93)
+# 93<<20 | 17<<7 | 0x13 = 0x05D00893
+li x1, 93
+slli x1, x1, 20
+li x2, 17
+slli x2, x2, 7
+add x3, x1, x2
+addi x3, x3, 19
+sw x3, 0(x8)
+addi x8, x8, 1
+
+# Instruction 2: ecall (0x00000073)
+li x1, 115
+sw x1, 0(x8)
+
+# --- Phase 4: Write ELF binary to file ---
+# SYS_WRITE_MEM: x15=8, x12=fd, x13=addr, x14=count
+# Count = 33 words * 4 bytes = 132 bytes
+
+# Open output file "out.elf" for writing
+li x15, 1           # SYS_OPEN
+li x13, 1           # mode = write
+ecall "out.elf"     # Opens file, x12 = fd
+
+# Save fd
+addi x12, x12, 0    # x12 is now fd (from ecall return)
+
+# Write 132 bytes from mem[0]
+li x15, 8           # SYS_WRITE_MEM
+li x13, 0           # Start address in mem
+li x14, 132         # Total byte count (33 words * 4)
+ecall
+
+# Close file
+li x15, 2           # SYS_CLOSE
+ecall
+
+# Exit
+li x15, 9
+li x10, 0
+ecall
