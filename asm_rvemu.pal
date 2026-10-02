@@ -1,4 +1,15 @@
 # asm_rvemu.pal - End-to-end test: encode RISC-V program via prisc+x, verify on rvemu
+#
+# Encodes a simple RISC-V bare-metal program:
+#   addi x10, x0, 5       # a0 = 5
+#   addi x11, x0, 3       # a1 = 3
+#   add  x12, x10, x11    # a2 = 8
+#   addi x17, x0, 93      # a7 = 93 (Linux exit syscall)
+#   addi x10, x0, 0       # a0 = 0 (exit code)
+#   ecall                 # exit
+#
+# Note: a7=x17 is beyond prisc+x's 16 registers (x0-x15), so we encode
+# addi x17, x0, 93 directly as a 32-bit word via bit-field arithmetic.
 
 li x8, 0
 
@@ -22,7 +33,7 @@ addi x3, x3, 19
 sw x3, 0(x8)
 addi x8, x8, 1
 
-# === add x12, x10, x11 ===
+# === add x12, x10, x11 (0x00B50633) ===
 li x1, 11
 slli x1, x1, 20
 li x2, 10
@@ -35,28 +46,42 @@ addi x3, x3, 51
 sw x3, 0(x8)
 addi x8, x8, 1
 
-# === li a0, 1 (for rvemu success exit) ===
-li x1, 1
+# === addi x17, x0, 93 (a7 = 93, exit syscall) ===
+# imm=93, rs1=0, funct3=0, rd=17, opcode=0x13
+# 93<<20 | 17<<7 | 0x13 = 97625491
+li x1, 93
 slli x1, x1, 20
-li x2, 10
+li x2, 17
 slli x2, x2, 7
 add x3, x1, x2
 addi x3, x3, 19
 sw x3, 0(x8)
 addi x8, x8, 1
 
-# === ecall ===
+# === addi x10, x0, 1 (a0 = 1 = PASS) ===
+# imm=1, rs1=0, funct3=0, rd=10, opcode=0x13
+# 1<<20 | 10<<7 | 0x13 = 1049875
+li x1, 1
+slli x1, x1, 20
+li x2, 10
+slli x2, x2, 7
+add x2, x2, x1
+addi x2, x2, 19
+sw x2, 0(x8)
+addi x8, x8, 1
+
+# === ecall (0x00000073 = 115) ===
 li x1, 115
 sw x1, 0(x8)
 
-# === Output to stdout via SYS_WRITE_MEM ===
+# === Output binary to stdout via SYS_WRITE_MEM ===
 li x15, 8
 li x12, 1
 li x13, 0
-li x14, 20
+li x14, 24
 ecall
 
-# === Exit ===
+# === Exit prisc+x VM ===
 li x15, 9
 li x10, 0
 ecall

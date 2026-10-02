@@ -112,7 +112,7 @@ typedef struct {
     uint8_t pin_dir;
     uint8_t src_wire;
     uint8_t dst_wire;
-    int16_t config_value;
+    int32_t config_value;
     char config_name[32];
 } bs_entry_t;
 
@@ -252,7 +252,7 @@ static int bs_load(bitstream_t *bs, const char *filename) {
             p = name_end;
             if (*p == '=') p++;
             skip_ws(&p);
-            e->config_value = (int16_t)parse_uint(&p);
+            e->config_value = (int32_t)parse_uint(&p);
             bs->num_entries++;
             continue;
         }

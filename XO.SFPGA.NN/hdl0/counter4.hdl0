@@ -1,14 +1,21 @@
-# 4-bit counter using LUT4 cascaded via carry chain
-# Each LUT computes next_bit = current_bit + carry_in
+# 4-bit counter using LUT4 + REG cascade
+# Each LUT computes next_bit = current_bit XOR 1 (toggle every cycle)
+# Registers store state and feed back to LUT inputs
 
-.LUT lut0 [in0, carry_in] = {0,1,0,1,0,1,0,1,1,0,1,0,1,0,1,0}
-.LUT lut1 [lut0.out, carry_in] = {0,1,0,1,0,1,0,1,1,0,1,0,1,0,1,0}
-.LUT lut2 [lut1.out, carry_in] = {0,1,0,1,0,1,0,1,1,0,1,0,1,0,1,0}
-.LUT lut3 [lut2.out, carry_in] = {0,1,0,1,0,1,0,1,1,0,1,0,1,0,1,0}
+.LUT lut0 [reg0.q, 1] = {0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT lut1 [reg1.q, 1] = {0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT lut2 [reg2.q, 1] = {0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT lut3 [reg3.q, 1] = {0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0}
 
-.CONFIG clk_div = 100000  ; divide system clock for visible counting
+.REG reg0 [lut0.out] clk clk_en=1
+.REG reg1 [lut1.out] clk clk_en=1
+.REG reg2 [lut2.out] clk clk_en=1
+.REG reg3 [lut3.out] clk clk_en=1
 
-.PIN out0 = lut0.out
-.PIN out1 = lut1.out
-.PIN out2 = lut2.out
-.PIN out3 = lut3.out
+.CONFIG clk_div = 1
+
+.PIN out0 = reg0.q
+.PIN out1 = reg1.q
+.PIN out2 = reg2.q
+.PIN out3 = reg3.q
+.END
