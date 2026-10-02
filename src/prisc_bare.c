@@ -316,6 +316,35 @@ static int label_count = 0, inst_count = 0, var_count = 0, op_count = 0;
 static int next_var_addr = 0;
 static char g_pal_dir[4096] = "";
 
+static void add_variable(const char *name, const char *type, const char *value_str) {
+    if (var_count >= MAX_VARS) return;
+    Variable *v = &variables[var_count++];
+    strncpy(v->name, name, 31);
+    strncpy(v->type, type, 15);
+    v->addr = next_var_addr;
+
+    if (strcmp(type, "int") == 0) {
+        v->value = atoi(value_str);
+        v->size = 1;
+        mem[next_var_addr++] = v->value;
+    }
+}
+
+static int is_variable_line(char *line) {
+    if (!line || !*line || *line == '#' ||
+        (line[0] == '#' && line[1] == 'i' && line[2] == 'n' &&
+         line[3] == 'c' && line[4] == 'l' && line[5] == 'u' &&
+         line[6] == 'd' && line[7] == 'e')) return 0;
+    char type[16], name[32], value[128];
+    if (sscanf(line, "%15s %31[^,\n]%*c %127[^\n]", type, name, value) == 3) {
+        if (strcmp(type, "int") == 0 || strcmp(type, "char") == 0 ||
+            strcmp(type, "string") == 0 || strcmp(type, "array") == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /* Forward declarations for functions used before definition */
 static int sscanf(const char *str, const char *format, ...);
 static void *memset(void *s, int c, size_t n);
@@ -817,8 +846,34 @@ int main(int argc, char **argv) {
     buf[buf_pos] = '\0';
     sys_close(fd);
 
-    /* First pass: labels */
     char *line_ptr = buf;
+
+    /* Parse variable declarations: int x1, 42 -> variables[x1].value=42 */
+    while (*line_ptr) {
+        char *nl = strchr(line_ptr, '\n');
+        if (nl) { *nl = '\0'; nl++; }
+        strcpy(line, line_ptr);
+        trim(line);
+        if (is_variable_line(line)) {
+            char type[16], name[32], value[256];
+            if (sscanf(line, "%15s %31[^,\n]%*c %255[^\n]", type, name, value) == 3) {
+                add_variable(name, type, value);
+            }
+        }
+        if (!nl) break;
+        line_ptr = nl;
+    }
+
+    /* Load variable initial values into registers */
+    for (int v = 0; v < var_count; v++) {
+        int regidx;
+        if (sscanf(variables[v].name, "x%d", &regidx) == 1 && regidx > 0 && regidx < 16) {
+            regs[regidx] = variables[v].value;
+        }
+    }
+
+    /* First pass: labels */
+    line_ptr = buf;
     inst_count = 0;
     while (*line_ptr) {
         char *nl = strchr(line_ptr, '\n');
