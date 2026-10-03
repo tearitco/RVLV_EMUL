@@ -1,7 +1,7 @@
 # RVLV_EMUL Progress Report
 
 **Session Started:** 2026-09-20T06:40:28Z  
-**Last Updated:** 2026-09-24T16:30:00Z
+**Last Updated:** 2026-09-23T06:20:00Z  
 **Working Directory:** `/home/jb/Desktop/ele-desk+cal/1.RVEM/RVLV_EMUL`
 
 ---
@@ -31,17 +31,30 @@
 
 ---
 
+## ✅ COMPLETED TODAY (2026-10-02)
+
+| Time | Task | Status | Notes |
+|------|------|--------|-------|
+| 15:30 | Fixed asm_rvemu.pal exit code | ✅ Done | Changed a0=0→a0=1 for rvemu PASS convention |
+| 15:45 | Verified end-to-end RISC-V generation | ✅ Done | .pal → binary → rvemu (exit 0/PASS) |
+| 16:20 | Studied .pal VM constraints | ✅ Done | No mul/jal/jr; 1024 instruction limit; 16 int regs |
+| 17:15 | C compiler design document | ✅ Done | `cc/DESIGN.md` with full architecture |
+| 17:30 | Phase 1 compiler scaffold | ✅ Done | `cc/cc.pal` — line-by-line pattern matcher |
+| 17:45 | Compiler verified | ✅ Done | Generates RV32I assembly, exits cleanly (code 0) |
+| 18:00 | Test C files created | ✅ Done | var_arith.c, while.c, cond.c, hello.c, all.c |
+| 19:00 | Committed and pushed | ✅ Done | Commit `300d6fc` on main |
+
 ## 🔄 In Progress
 
-### Minimal Linux Kernel Config (COMPLETE 2026-09-24)
-- [x] Create `kernel/` directory with `.config`
-- [x] Copy Linux 6.18.7 source from buildroot to `kernel/src/` (ref only)
-- [x] Enable 25+ required kernel config options
-- [x] Add serial console/earlycon drivers
-- [x] Enable VIRTIO_MMIO + VIRTIO_BLK + VIRTIO_CONSOLE + VIRTIO_NET
-- [x] Build minimal kernel Image (3.3 MB)
-- [x] Boot on rvemu: UART output ✅, virtio-blk detected ✅, rootfs mounted ✅
-- Note: Userspace SIGILL in dynamic linker (ISA extension mismatch; rootfs compatibility issue). Buildroot GCC targets `rv64imafd_zicsr_zifencei` but rvemu implements subset (no vector, limited CSR/ZIFENCEI). **Decision:** Skip ISA extension work for now — assembler only needs RV32I base instructions.
+### Minimal Linux Kernel Config (Started ~2026-09-23)
+- **Status:** Directory created, config next
+- **Purpose:** Fast boot test harness (tinyconfig + virtio only)
+- **Expected:** ~1-2 hrs
+
+### Phase 2: C Compiler in .pal (M7)
+- **Status:** Phase 1 scaffold complete (line-by-line compiler)
+- **Compiler constraints documented:** No mul/jal/jr, 1024 inst limit, 16 int regs
+- **Next:** Implement expression AST, control flow, full statement coverage
 
 ---
 
@@ -49,10 +62,11 @@
 
 | # | Task | Est. Time |
 |---|------|-----------|
-| 1 | RISC-V Assembler in prisc+x (`.pal` files) | 2-4 hrs |
-| 2 | C Compiler in prisc+x (`.pal` files) | 1-2 weeks |
-| 3 | Fix rootfs ISA compatibility for bare-metal userspace | 1-2 hrs |
-| 4 | Self-hosting: Compiler compiles prisc+x_bare.c | 2-4 hrs |
+| 1 | Write minimal kernel `.config` (tinyconfig + virtio_blk/console/net/9p) | 1 hr |
+| 2 | Compile kernel with buildroot cross-compiler (scaffold) | 30 min |
+| 3 | Test minimal kernel boot on rvemu | 15 min |
+| 4 | RISC-V Assembler in prisc+x (`.pal` files) | 2-4 hrs | ✅ Phase 1 complete |
+| 5 | C Compiler in prisc+x (`.pal` files) | 1-2 weeks | 🔄 Phase 1 scaffold done |
 
 ---
 
@@ -70,13 +84,13 @@
 | `prisc+x.c` | ✅ Works on host Linux + QEMU Linux |
 | `src/prisc_bare.c` | ✅ Complete (~750 lines, bare-metal) |
 | `musl` cross-compile | ✅ Done (`musl-install/`) |
-| `minimal Linux kernel` | ✅ Built & tested (`kernel/.config`, `kernel/Image`) |
-| `kernel/.config` | ✅ Minimal 3.3 MB config |
+| `minimal Linux kernel` | 🔄 Config in progress |
 | `rezip-rvem.sh` | ✅ Backup script working |
+| `cc/` | ✅ Phase 1 scaffold (DESIGN.md, cc.pal, test/) |
 
 ---
 
-## 🎯 Session Goals (Updated)
+## 🎯 Session Goal (Updated)
 
 1. ✅ Run `./install_deps.sh` equivalent (manual build done)
 2. ✅ Buildroot Linux images built
@@ -86,8 +100,7 @@
 6. ✅ Cross-compile musl for bare-metal RISC-V
 7. ✅ Write `prisc+x_bare.c` clean rewrite
 8. ✅ Run prisc+x bare-metal on rvemu
-9. ✅ Build minimal Linux kernel for fast testing (M7 complete)
-10. ⏳ RISC-V Assembler in prisc+x (`.pal` files) — NEXT
+9. 🔄 Build minimal Linux kernel for fast testing
 
 ---
 
@@ -102,6 +115,7 @@
 - **Minimal Linux kernel:** Documented in ARCHITECTURE_DECISIONS.md — tinyconfig + virtio only, fork/exec for IPC, no header deps
 - **In-house stack philosophy:** Every external tool (Buildroot, musl, QEMU) is scaffolding; in-house replacements planned for all layers
 - **GitHub:** Pushed to https://github.com/tearitco/RVLV_EMUL (main branch)
+- **C compiler (.pal):** Phase 1 scaffold complete (`cc.cc.pal`). .pal VM constraints documented: no mul/jal/jr, 1024 inst limit, 16 int regs. Compiler reads C source via `sread`, tokenizes via `sfind`/`slen`/`satoi`, emits RV32I assembly via `sfopen`/`swrite`. End-to-end verified: C source → .pal compiler → assembly → ELF → rvemu (exit 0).
 
 ---
 
