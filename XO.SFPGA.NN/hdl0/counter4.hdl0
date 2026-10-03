@@ -1,6 +1,5 @@
 # 4-bit counter using LUT4 + REG cascade
 # Each LUT computes next_bit = current_bit XOR 1 (toggle every cycle)
-# Registers store state and feed back to LUT inputs
 
 .LUT lut0 [reg0.q, 1] = {0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0}
 .LUT lut1 [reg1.q, 1] = {0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0}

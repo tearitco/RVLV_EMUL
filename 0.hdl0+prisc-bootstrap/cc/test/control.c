@@ -1,0 +1,10 @@
+# Test file: control.c
+# Tests control flow: while loops and condition variables
+int main() {
+    int i = 0;
+    while (i < 3) {
+        putint(i);
+        i = i + 1;
+    }
+    return 0;
+}

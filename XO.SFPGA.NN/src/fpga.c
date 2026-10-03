@@ -267,6 +267,8 @@ static int bs_apply(fpga_t *fpga, const bitstream_t *bs) {
     if (bs->magic != BITSTREAM_MAGIC) return -1;
 
     memset(fpga, 0, sizeof(fpga_t));
+    fpga->wires[0] = 0;
+    fpga->wires[1] = 1;
     fpga->n_rows = bs->rows ? bs->rows : 4;
     fpga->n_cols = bs->cols ? bs->cols : 4;
     fpga->clk_div = 1;

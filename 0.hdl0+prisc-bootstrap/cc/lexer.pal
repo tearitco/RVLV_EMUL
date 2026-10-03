@@ -1,0 +1,346 @@
+# lexer.pal - C Lexer Stage 1
+# ===========================================
+# Tokenizes C source into a token array in dmem.
+#
+# Available .pal instructions:
+#   addi, add, sub, andi, ori, xori
+#   slli, srli, sll, slt, sltu, xor, or, srl, sra
+#   lw, sw, li, beq, bne, j, halt, ecall, builtin_out
+#   slit, scpy, sappend, sfmt, sread, sfind, slen
+#   sfopen, sfappend, swrite, sfclose, sbeq, sbne, strim, satoi
+#
+# No blt/bgt/jal/jr - use slt + bne for "less than" branches.
+#
+# Memory layout:
+#   dmem[500-999]: token array (3 slots per token)
+#     slot 0: type (1=keyword,2=ident,3=int_lit,4=op,5=punct)
+#     slot 1: value (int value for int_lit, 0 otherwise)
+#     slot 2: str_idx (index into string token pool)
+#
+# String registers (s0-s31):
+#   s0 = source text (input C source)
+#   s1 = current 1-char read
+#   s2 = current token buffer (building identifiers/literals)
+#   s3-s7 = scratch
+#
+# Register usage:
+#   x1 = src_idx     (position in source string)
+#   x2 = tok_count   (number of tokens emitted)
+#   x3 = char_code   (ASCII code of current char)
+#   x4 = temp
+#   x5 = TOKENS_BASE (constant 500)
+#   x6 = temp
+#   x7 = temp
+#   x8 = tok_flag   (0=no token being built, 1=building)
+#   x9 = tok_slot   (base address of current token in dmem)
+#   x10 = temp
+#   x11 = temp
+#   x12 = temp
+#   x13 = temp
+#   x14 = temp
+#   x15 = syscall number (reserved)
+
+int TOKENS_BASE, 500
+
+# === Initialize ===
+li x1, 0            # src_idx = 0
+li x2, 0            # tok_count = 0
+li x5, 500          # TOKENS_BASE
+li x8, 0            # tok_flag = 0 (not building)
+
+# === Main lex loop ===
+lex_loop:
+    sread s1, s0, x1          # s1 = char at position x1
+    slen x4, s1               # x4 = length of s1
+    beq x4, x0, lex_emit_rest  # if empty (end of source), flush and exit
+
+    satoi x3, s1              # x3 = ASCII code of current char
+
+    # --- Whitespace check (32=space, 9=tab, 10=nl, 13=cr) ---
+    li x4, 32
+    beq x3, x4, lex_whitespace
+    li x4, 9
+    beq x3, x4, lex_whitespace
+    li x4, 10
+    beq x3, x4, lex_whitespace
+    li x4, 13
+    beq x3, x4, lex_whitespace
+
+    # --- Identifier start: a-z (97-122), A-Z (65-90), _ (95) ---
+    # Check lowercase a-z: 97 <= x3 <= 122
+    li x4, 97
+    sub x6, x3, x4          # x6 = x3 - 97
+    bltz_flag:               # pseudo: we use slt for this
+
+    # Use slt pattern for range checks:
+    # To check 97 <= x3 <= 122:
+    #   slt x6, x3, x4  → x6 = 1 if x3 < 97 (false if >= 97)
+    #   bne x6, x0, not_lower
+    li x4, 97
+    slt x6, x3, x4          # x6 = 1 if x3 < 97
+    bne x6, x0, check_upper
+    li x4, 123
+    slt x6, x3, x4          # x6 = 1 if x3 < 123 (true for 97-122)
+    beq x6, x0, check_upper  # if x6=0 (x3 >= 123), not lowercase
+    j lex_ident
+
+check_upper:
+    # Check uppercase A-Z: 65 <= x3 <= 90
+    li x4, 65
+    slt x6, x3, x4          # x6 = 1 if x3 < 65
+    bne x6, x0, check_under
+    li x4, 91
+    slt x6, x3, x4          # x6 = 1 if x3 < 91 (true for 65-90)
+    beq x6, x0, check_under
+    j lex_ident
+
+check_under:
+    # Check underscore: x3 == 95
+    li x4, 95
+    beq x3, x4, lex_ident
+
+    # --- Digit: 48 <= x3 <= 57 ---
+    li x4, 48
+    slt x6, x3, x4          # x6 = 1 if x3 < 48
+    bne x6, x0, lex_oper_punct
+    li x4, 58
+    slt x6, x3, x4          # x6 = 1 if x3 < 58
+    beq x6, x0, lex_oper_punct
+    j lex_digit
+
+lex_ident:
+    # If not building a token, start new one
+    beq x8, x0, lex_start_token
+    # Continue building: append char to s2
+    sappend s2, s1
+    j lex_next
+
+lex_digit:
+    beq x8, x0, lex_start_token
+    sappend s2, s1
+    j lex_next
+
+lex_start_token:
+    scpy s2, s1             # s2 = first char of new token
+    li x8, 1                # tok_flag = 1 (building)
+    # Save char type hint in x6: 1=ident-ish, 2=digit
+    # Use x3 value to determine: if 48<=x3<=57 → digit
+    li x4, 48
+    slt x6, x3, x4          # x6 = 1 if x3 < 48
+    bne x6, x0, set_ident_type
+    j set_digit_type
+
+set_ident_type:
+    li x6, 1                # token type hint: identifier/keyword
+    j lex_next
+
+set_digit_type:
+    li x6, 2                # token type hint: integer literal
+    j lex_next
+
+lex_oper_punct:
+    # Flush pending token if any
+    bne x8, x0, lex_flush
+    # Emit current char as operator/punct
+    li x6, 4                # type = OP (default)
+    li x3, 40               # '(' = 40
+    beq x3, x0, emit_punct_lparen  # Can't use x0 this way; restructured below
+
+    # For single-char operators/punctuators, compare against each:
+    li x4, 40               # '('
+    beq x3, x4, emit_lparen
+    li x4, 41               # ')'
+    beq x3, x4, emit_rparen
+    li x4, 59               # ';'
+    beq x3, x4, emit_semi
+    li x4, 44               # ','
+    beq x3, x4, emit_comma
+    li x4, 123              # '{'
+    beq x3, x4, emit_lbrace
+    li x4, 125              # '}'
+    beq x3, x4, emit_rbrace
+    li x4, 60               # '<'
+    beq x3, x4, emit_lt
+    li x4, 62               # '>'
+    beq x3, x4, emit_gt
+    li x4, 61               # '='
+    beq x3, x4, emit_assign
+    li x4, 43               # '+'
+    beq x3, x4, emit_plus
+    li x4, 45               # '-'
+    beq x3, x4, emit_minus
+    li x4, 42               # '*'
+    beq x3, x4, emit_star
+    li x4, 47               # '/'
+    beq x3, x4, emit_slash
+    li x4, 37               # '%'
+    beq x3, x4, emit_mod
+    j lex_next              # unknown char, skip
+
+emit_lparen:
+    li x6, 5                # type = PUNCT
+    jal x7, lex_emit_char
+    j lex_next
+
+emit_rparen:
+    li x6, 5
+    jal x7, lex_emit_char
+    j lex_next
+
+emit_semi:
+    li x6, 5
+    jal x7, lex_emit_char
+    j lex_next
+
+emit_comma:
+    li x6, 5
+    jal x7, lex_emit_char
+    j lex_next
+
+emit_lbrace:
+    li x6, 5
+    jal x7, lex_emit_char
+    j lex_next
+
+emit_rbrace:
+    li x6, 5
+    jal x7, lex_emit_char
+    j lex_next
+
+emit_lt:
+    li x6, 4                # type = OP
+    li x3, 60               # '<'
+    jal x7, lex_emit_char
+    j lex_next
+
+emit_gt:
+    li x6, 4
+    li x3, 62               # '>'
+    jal x7, lex_emit_char
+    j lex_next
+
+emit_assign:
+    li x6, 4
+    li x3, 61               # '='
+    jal x7, lex_emit_char
+    j lex_next
+
+emit_plus:
+    li x6, 4
+    li x3, 43               # '+'
+    jal x7, lex_emit_char
+    j lex_next
+
+emit_minus:
+    li x6, 4
+    li x3, 45               # '-'
+    jal x7, lex_emit_char
+    j lex_next
+
+emit_star:
+    li x6, 4
+    li x3, 42               # '*'
+    jal x7, lex_emit_char
+    j lex_next
+
+emit_slash:
+    li x6, 4
+    li x3, 47               # '/'
+    jal x7, lex_emit_char
+    j lex_next
+
+emit_mod:
+    li x6, 4
+    li x3, 37               # '%'
+    jal x7, lex_emit_char
+    j lex_next
+
+lex_flush:
+    # Flush the pending token in s2
+    # x6 contains the token type hint (1=ident, 2=literal)
+    # Classify: if ident-type token, check keywords
+    beq x6, x0, flush_done
+    li x4, 1
+    beq x6, x4, lex_classify_keyword
+    # x6 = 2 → integer literal
+    satoi x4, s2            # x4 = integer value
+    li x6, 3                # type = INT_LIT
+    jal x7, lex_emit_token
+    j flush_done
+
+lex_classify_keyword:
+    # Check common keywords
+    slit s4, "int"
+    sbeq s2, s4, flush_keyword
+    slit s4, "return"
+    sbeq s2, s4, flush_keyword
+    slit s4, "while"
+    sbeq s2, s4, flush_keyword
+    slit s4, "if"
+    sbeq s2, s4, flush_keyword
+    slit s4, "else"
+    sbeq s2, s4, flush_keyword
+    slit s4, "void"
+    sbeq s2, s4, flush_keyword
+    slit s4, "char"
+    sbeq s2, s4, flush_keyword
+    # Not a keyword → identifier
+    li x6, 2                # type = IDENT
+    jal x7, lex_emit_token
+    j flush_done
+
+flush_keyword:
+    li x6, 1                # type = KEYWORD
+    jal x7, lex_emit_token
+
+flush_done:
+    li x8, 0                # tok_flag = 0 (not building)
+    # Re-process current char
+    j lex_loop_reprocess
+
+lex_loop_reprocess:
+    # We are here after flushing - need to skip the current char
+    j lex_next
+
+lex_emit_char:
+    # Emit current char as a token with type x6
+    # x3 = char code, x6 = type
+    li x4, 3                # stride = 3
+    mul x9, x2, x4          # x9 = tok_count * 3
+    add x9, x5, x9          # x9 = TOKENS_BASE + tok_count * 3
+    sw x6, 0(x9)            # slot 0: type
+    li x4, 0
+    sw x4, 4(x9)            # slot 1: value = 0
+    sw x4, 8(x9)            # slot 2: str_idx = 0
+    addi x2, x2, 1          # tok_count++
+    jr x7
+
+lex_emit_token:
+    # x6 = type, value already set where applicable
+    li x4, 3                # stride = 3
+    mul x9, x2, x4
+    add x9, x5, x9
+    sw x6, 0(x9)            # slot 0: type
+    sw x4, 4(x9)            # slot 1: value (for int_lit, x4 was set via satoi)
+    li x4, 0
+    sw x4, 8(x9)            # slot 2: str_idx
+    addi x2, x2, 1
+    jr x7
+
+lex_whitespace:
+    # If building a token, flush it first
+    bne x8, x0, lex_flush
+    j lex_next
+
+lex_next:
+    addi x1, x1, 1          # src_idx++
+    j lex_loop
+
+lex_emit_rest:
+    # End of source - flush pending token if any
+    beq x8, x0, lex_done
+    jal x7, lex_flush
+lex_done:
+    # Output token count via builtin_out
+    builtin_out x2
+    halt

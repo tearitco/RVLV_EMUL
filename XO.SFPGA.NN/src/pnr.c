@@ -172,15 +172,12 @@ static uint8_t resolve_signal(ctx_t *ctx, const char *name) {
         }
     }
     len = strlen(lookup);
-    fprintf(stderr, "  DOTQ check: lookup='%s' len=%zu suffix='%s'\n", lookup, len, lookup + len - 3);
-    if (len >= 3 && strcmp(lookup + len - 3, ".q") == 0) {
-        fprintf(stderr, "  DOTQ: matched .q suffix\n");
-        size_t slen = len - 3;
+    if (len >= 2 && strcmp(lookup + len - 2, ".q") == 0) {
+        size_t slen = len - 2;
         if (slen >= MAX_NAME) slen = MAX_NAME - 1;
         memcpy(stripped, lookup, slen);
         stripped[slen] = '\0';
         lookup = stripped;
-        fprintf(stderr, "  DOTQ: lookup now='%s'\n", lookup);
         for (int i = 0; i < ctx->n_symbols; i++) {
             if (strcmp(ctx->symbols[i].name, stripped) == 0)
                 return ctx->symbols[i].wire_id;
@@ -190,14 +187,10 @@ static uint8_t resolve_signal(ctx_t *ctx, const char *name) {
         if (strcmp(ctx->symbols[i].name, lookup) == 0)
             return ctx->symbols[i].wire_id;
     }
-    fprintf(stderr, "  DEBUG resolve: looking for '%s', %d symbols\n", lookup, ctx->n_symbols);
-    for (int i = 0; i < ctx->n_symbols; i++)
-        fprintf(stderr, "    sym[%d]: '%s' -> wire %d\n", i, ctx->symbols[i].name, ctx->symbols[i].wire_id);
     if (ctx->n_symbols >= MAX_SIGNS) return 0;
     signal_t *s = &ctx->symbols[ctx->n_symbols++];
     strncpy(s->name, lookup, MAX_NAME - 1);
     s->wire_id = ctx->next_wire++;
-    fprintf(stderr, "  DEBUG resolve: created '%s' -> wire %d\n", s->name, s->wire_id);
     if (ctx->next_wire >= MAX_WIRES) ctx->next_wire = MAX_WIRES - 1;
     return s->wire_id;
 }
