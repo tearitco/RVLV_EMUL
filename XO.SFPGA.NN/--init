@@ -1,0 +1,11 @@
+# xo-sfpga simulation trace
+# bitstream=/tmp/counter4_final.bit fabric=4x4 cycles=8
+cycle clk pin0 pin1 pin2 pin3 pin4 pin5 pin6 pin7 wire8 wire9 wire10 wire11 wire12 wire13 wire14 wire15 
+    0   1    1    0    0    0    0    0    0    0    0    0    0    0    0    0    0    0 
+    1   0    1    0    0    0    0    0    0    0    0    0    0    0    0    0    0    0 
+    2   1    0    1    0    0    0    0    0    0    0    0    0    0    0    0    0    0 
+    3   0    0    1    0    0    0    0    0    0    0    0    0    0    0    0    0    0 
+    4   1    1    1    0    0    0    0    0    0    0    0    0    0    0    0    0    0 
+    5   0    1    1    0    0    0    0    0    0    0    0    0    0    0    0    0    0 
+    6   1    0    0    1    0    0    0    0    0    1    0    0    0    0    0    0    0 
+    7   0    0    0    1    0    0    0    0    0    1    0    0    0    0    0    0    0 

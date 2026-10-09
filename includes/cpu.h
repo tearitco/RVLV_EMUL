@@ -13,6 +13,17 @@ enum {
     ACC_STORE = 2,
 };
 
+#define SYS_WRITE      64
+#define SYS_READ        63
+#define SYS_EXIT        93
+#define SYS_BRK        214
+#define SYS_OPEN      1024
+#define SYS_CLOSE       57
+#define SYS_FSTAT       80
+#define SYS_LSEEK       62
+#define SYS_FPGA_LOAD   10
+#define SYS_SPAWN      400
+
 typedef struct CPU {
     uint64_t regs[32];
     uint64_t fregs[32];

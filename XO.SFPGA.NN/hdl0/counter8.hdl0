@@ -1,0 +1,41 @@
+# 8-bit free-running counter with output latch
+# Uses LUT cascade: bit toggles when all lower bits are 1
+
+# Stage 1: Toggle LUTs (bit N toggles when all lower bits = 1)
+.LUT inc0 [cnt0.q, 1] = {0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT inc1 [cnt1.q, cnt0.q] = {0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT inc2 [cnt2.q, cnt0.q, cnt1.q] = {0,1,0,1,0,1,1,0,0,0,0,0,0,0,0,0}
+.LUT inc3 [cnt3.q, cnt0.q, cnt1.q, cnt2.q] = {0,1,0,1,0,1,0,1,0,1,0,1,0,1,1,0}
+
+# Carry out from bit 3: AND all 4 bits (cnt0.q & cnt1.q & cnt2.q & cnt3.q)
+.LUT carry3 [cnt0.q, cnt1.q, cnt2.q, cnt3.q] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1}
+
+.LUT inc4 [cnt4.q, carry3.out, 1] = {0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT inc5 [cnt5.q, cnt4.q, cnt0.q, cnt1.q] = {0,0,0,0,0,0,0,1,0,0,0,0,0,1,1,1}
+.LUT inc6 [cnt6.q, cnt5.q, cnt4.q, carry3.out] = {0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1}
+
+# Carry out from bit 6: AND bits 0-6
+.LUT carry6 [cnt4.q, cnt5.q, cnt6.q, carry3.out] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1}
+
+.LUT inc7 [cnt7.q, carry6.out, 1] = {0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0}
+
+# Register stage: capture incremented value on clock edge
+.REG cnt0 [inc0.out] clk
+.REG cnt1 [inc1.out] clk
+.REG cnt2 [inc2.out] clk
+.REG cnt3 [inc3.out] clk
+.REG cnt4 [inc4.out] clk
+.REG cnt5 [inc5.out] clk
+.REG cnt6 [inc6.out] clk
+.REG cnt7 [cnt7.out] clk
+
+# Output pins show counter value
+.PIN out0 = cnt0.q
+.PIN out1 = cnt1.q
+.PIN out2 = cnt2.q
+.PIN out3 = cnt3.q
+.PIN out4 = cnt4.q
+.PIN out5 = cnt5.q
+.PIN out6 = cnt6.q
+.PIN out7 = cnt7.q
+.END

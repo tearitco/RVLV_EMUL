@@ -940,6 +940,17 @@ Trap cpu_execute(CPU *cpu, uint32_t inst, int ilen)
                     }
                 }
                 if (cpu->priv == PRIV_M && (cpu->csr[MTVEC] & ~3ull) == 0) {
+                    uint64_t a7 = cpu->regs[17];
+                    if (a7 == SYS_EXIT || a7 == SYS_WRITE || a7 == SYS_READ ||
+                        a7 == SYS_FPGA_LOAD || a7 == SYS_OPEN || a7 == SYS_CLOSE) {
+                        uint64_t ret = syscall_handle(cpu, a7, cpu->regs[10], cpu->regs[11],
+                                                      cpu->regs[12], cpu->regs[13],
+                                                      cpu->regs[14], cpu->regs[15],
+                                                      cpu->regs[16]);
+                        cpu->regs[10] = ret;
+                        cpu->pc = next;
+                        break;
+                    }
                     cpu->halt = 1;
                     cpu->halt_code = (cpu->regs[10] == 1) ? 0 : 1;
                     cpu->pc = next;

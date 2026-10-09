@@ -17,116 +17,42 @@
  *   .CONFIG name value
  *   .END
  */
+#include <fpga_hw.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <stdint.h>
 
-#define FPGA_NAME "xo-sfpga"
-#define FPGA_VERSION "0.1.0"
+#define LUT_SIZE_4    FPGA_LUT_SIZE
+#define BUS_WIDTH     FPGA_BUS_WIDTH
+#define MAX_CLBS      FPGA_MAX_CLBS
+#define MAX_LUTS_PER_CLB  FPGA_MAX_LUTS_PER_CLB
+#define MAX_REGS_PER_CLB  FPGA_MAX_REGS_PER_CLB
+#define MAX_WIRES     FPGA_MAX_WIRES
+#define MAX_SWITCHBOXES FPGA_MAX_SWITCHBOXES
+#define MAX_PINS      FPGA_MAX_PINS
+#define SB_BUS_DIRECT FPGA_SB_BUS_DIRECT
 
-#define LUT_SIZE_4    16
-#define BUS_WIDTH     6
-#define MAX_CLBS      64
-#define MAX_LUTS_PER_CLB  4
-#define MAX_REGS_PER_CLB  4
-#define MAX_WIRES     256
-#define MAX_SWITCHBOXES 256
-#define MAX_PINS      16
-#define SB_BUS_DIRECT 0xFF
+#define OP_LUT3       0
+#define OP_LUT4       1
+#define OP_REG        2
+#define OP_CONNECT    3
+#define OP_PIN        4
+#define OP_CONFIG     5
 
-#define OP_LUT3    0
-#define OP_LUT4    1
-#define OP_REG     2
-#define OP_CONNECT 3
-#define OP_PIN     4
-#define OP_CONFIG  5
+#define BITSTREAM_MAGIC FPGA_BITSTREAM_MAGIC
+#define BITSTREAM_VERSION FPGA_BITSTREAM_VERSION
 
-typedef struct {
-    uint8_t truth_table[LUT_SIZE_4];
-    uint8_t n_inputs;
-    uint8_t inputs[MAX_WIRES];
-    uint8_t output_wire;
-    uint8_t output;
-} lut_t;
-
-typedef struct {
-    uint8_t d[4];
-    uint8_t q[4];
-    uint8_t clk_en;
-    uint8_t clk;
-    uint8_t output_wire;
-} reg_t;
-
-typedef struct {
-    uint8_t values[BUS_WIDTH];
-} bus_t;
-
-typedef struct {
-    uint8_t src_bus;
-    uint8_t src_bit;
-    uint8_t dst_bus;
-    uint8_t dst_bit;
-} switchbox_conn_t;
-
-typedef struct {
-    lut_t  luts[MAX_LUTS_PER_CLB];
-    reg_t  regs[MAX_REGS_PER_CLB];
-    bus_t  north, south, east, west;
-    uint8_t has_reg;
-} clb_t;
-
-typedef struct {
-    switchbox_conn_t conns[BUS_WIDTH];
-    uint8_t n_conns;
-} switchbox_t;
-
-typedef struct {
-    clb_t  grid[MAX_CLBS];
-    uint8_t n_rows;
-    uint8_t n_cols;
-    bus_t  io_pins[MAX_PINS];
-    uint8_t wires[MAX_WIRES];
-    switchbox_t sb[MAX_SWITCHBOXES];
-    uint8_t n_switchboxes;
-    uint8_t clk_div;
-    uint8_t clk_counter;
-    uint8_t clk;
-} fpga_t;
-
-typedef struct {
-    uint8_t op;
-    uint8_t clb_row;
-    uint8_t clb_col;
-    uint8_t lut_idx;
-    uint8_t n_inputs;
-    uint8_t inputs[BUS_WIDTH];
-    uint8_t output_wire;
-    uint8_t truth_table[16];
-    uint8_t reg_idx;
-    uint8_t d[4];
-    uint8_t clk_en;
-    uint8_t clk_src;
-    uint8_t pin_id;
-    uint8_t pin_dir;
-    uint8_t src_wire;
-    uint8_t dst_wire;
-    int32_t config_value;
-    char config_name[32];
-} bs_entry_t;
-
-typedef struct {
-    uint32_t magic;
-    uint32_t version;
-    uint16_t num_entries;
-    uint8_t  rows;
-    uint8_t  cols;
-    bs_entry_t entries[256];
-} bitstream_t;
-
-#define BITSTREAM_MAGIC 0x584F5346
-#define BITSTREAM_VERSION 1
+typedef fpga_lut_t lut_t;
+typedef fpga_reg_t reg_t;
+typedef fpga_bus_t bus_t;
+typedef fpga_switchbox_conn_t switchbox_conn_t;
+typedef fpga_clb_t clb_t;
+typedef fpga_switchbox_t switchbox_t;
+typedef fpga_bs_entry_t bs_entry_t;
+typedef fpga_bitstream_t bitstream_t;
+typedef fpga_t fpga_t;
 
 static void skip_ws(char **p) {
     while (isspace((unsigned char)**p)) (*p)++;
@@ -163,7 +89,7 @@ static void parse_tt16(char *s, char *end, uint8_t tt[16]) {
     while (idx < 16) tt[idx++] = 0;
 }
 
-static int bs_load(bitstream_t *bs, const char *filename) {
+int fpga_bs_load(bitstream_t *bs, const char *filename) {
     memset(bs, 0, sizeof(bitstream_t));
     bs->magic = BITSTREAM_MAGIC;
     bs->version = BITSTREAM_VERSION;
@@ -262,7 +188,7 @@ static int bs_load(bitstream_t *bs, const char *filename) {
     return (int)bs->num_entries;
 }
 
-static int bs_apply(fpga_t *fpga, const bitstream_t *bs) {
+int fpga_bs_apply(fpga_t *fpga, const bitstream_t *bs) {
     if (!fpga || !bs) return -1;
     if (bs->magic != BITSTREAM_MAGIC) return -1;
 
@@ -303,14 +229,11 @@ static int bs_apply(fpga_t *fpga, const bitstream_t *bs) {
                 break;
             }
             case OP_CONNECT:
-                if (e->src_wire < MAX_WIRES && e->dst_wire < MAX_WIRES) {
-                    fpga->wires[e->dst_wire] = fpga->wires[e->src_wire];
-                }
+                fpga->wires[e->dst_wire] = fpga->wires[e->src_wire];
                 break;
             case OP_PIN:
-                if (e->pin_id < MAX_PINS && e->src_wire < MAX_WIRES) {
-                    fpga->io_pins[e->pin_id].values[0] = e->src_wire;
-                }
+                fpga->io_pins[e->pin_id].values[0] = e->src_wire;
+                fpga->pin_dir[e->pin_id] = e->pin_dir;
                 break;
             case OP_CONFIG:
                 if (strcmp(e->config_name, "clk_div") == 0)
@@ -321,6 +244,7 @@ static int bs_apply(fpga_t *fpga, const bitstream_t *bs) {
     return 0;
 }
 
+__attribute__((unused))
 static void lut_init(lut_t *lut) {
     memset(lut->truth_table, 0, LUT_SIZE_4);
     lut->n_inputs = 0;
@@ -357,18 +281,25 @@ static void switchbox_eval(fpga_t *fpga) {
         for (uint8_t c = 0; c < sb->n_conns; c++) {
             switchbox_conn_t *conn = &sb->conns[c];
             if (conn->src_bus == SB_BUS_DIRECT && conn->dst_bus == SB_BUS_DIRECT) {
-                if (conn->dst_bit < MAX_WIRES)
-                    fpga->wires[conn->dst_bit] = fpga->wires[conn->src_bit];
+                fpga->wires[conn->dst_bit] = fpga->wires[conn->src_bit];
             }
         }
     }
 }
 
-static void fpga_cycle(fpga_t *fpga) {
+void fpga_cycle(fpga_t *fpga) {
     fpga->clk_counter++;
     if (fpga->clk_counter >= fpga->clk_div) {
         fpga->clk_counter = 0;
         fpga->clk = !fpga->clk;
+    }
+
+    /* Drive input pins: copy external value to wire so LUTs can read it */
+    for (uint8_t p = 0; p < MAX_PINS; p++) {
+        if (fpga->pin_dir[p] == 0) {
+            uint8_t wire = fpga->io_pins[p].values[0];
+            fpga->wires[wire] = fpga->io_pins[p].values[1];
+        }
     }
 
     switchbox_eval(fpga);
@@ -396,28 +327,34 @@ static void fpga_cycle(fpga_t *fpga) {
         }
     }
 
+    /* Read output pins: copy wire value to values[1] for CPU access */
     for (uint8_t p = 0; p < MAX_PINS; p++) {
-        uint8_t wire = fpga->io_pins[p].values[0];
-        fpga->io_pins[p].values[1] = fpga->wires[wire];
+        if (fpga->pin_dir[p] != 0) {
+            uint8_t wire = fpga->io_pins[p].values[0];
+            fpga->io_pins[p].values[1] = fpga->wires[wire];
+        }
     }
 }
 
-static void fpga_set_wire(fpga_t *fpga, uint8_t wire, uint8_t value) {
+void fpga_set_wire(fpga_t *fpga, uint8_t wire, uint8_t value) {
     fpga->wires[wire] = value;
 }
 
-static uint8_t fpga_get_wire(fpga_t *fpga, uint8_t wire) {
+uint8_t fpga_get_wire(fpga_t *fpga, uint8_t wire) {
     return fpga->wires[wire];
 }
 
-static void fpga_set_pin(fpga_t *fpga, uint8_t pin, uint8_t value) {
-    if (pin < MAX_PINS) fpga->io_pins[pin].values[0] = value;
+void fpga_set_pin(fpga_t *fpga, uint8_t pin, uint8_t value) {
+    if (pin < MAX_PINS && fpga->pin_dir[pin] == 0)
+        fpga->io_pins[pin].values[1] = value;
 }
 
-static uint8_t fpga_get_pin(fpga_t *fpga, uint8_t pin) {
+uint8_t fpga_get_pin(fpga_t *fpga, uint8_t pin) {
     if (pin < MAX_PINS) return fpga->io_pins[pin].values[1];
     return 0;
 }
+
+#ifdef FPGA_STANDALONE
 
 static int tpass = 0, tfail = 0;
 
@@ -525,7 +462,7 @@ static void test_bitstream_io(void) {
     e->op = OP_PIN;
     e->pin_id = 0; e->pin_dir = 1; e->src_wire = 20;
 
-    check_int(bs_apply(&fpga, &bs), 0, "bitstream_apply");
+    check_int(fpga_bs_apply(&fpga, &bs), 0, "bitstream_apply");
 
     fpga_set_wire(&fpga, 10, 1); fpga_set_wire(&fpga, 11, 1);
     fpga_cycle(&fpga);
@@ -626,7 +563,7 @@ static void test_bitstream_save_load(void) {
     fclose(f);
 
     bitstream_t bs2;
-    int rc = bs_load(&bs2, "/tmp/test_roundtrip.bit");
+    int rc = fpga_bs_load(&bs2, "/tmp/test_roundtrip.bit");
     check_int(rc, 1, "bitstream_load returns 1");
     check_int(bs2.entries[0].op, OP_LUT4, "Loaded LUT4");
     check_int(bs2.entries[0].n_inputs, 2, "Loaded n_inputs=2");
@@ -656,22 +593,48 @@ int main(int argc, char **argv) {
     }
 
     const char *bitfile = argv[1];
-    int cycles = 10;
+    int cycles = 1;
     const char *outfile = NULL;
+    const char *init_str = NULL;
 
-    if (argc >= 3) cycles = atoi(argv[2]);
-    if (argc >= 4) outfile = argv[3];
+    for (int i = 2; i < argc; i++) {
+        if (strcmp(argv[i], "--init") == 0 && i + 1 < argc) {
+            init_str = argv[++i];
+        } else if (strcmp(argv[i], "--out") == 0 && i + 1 < argc) {
+            outfile = argv[++i];
+        } else if (outfile == NULL && argv[i][0] != '-') {
+            cycles = atoi(argv[i]);
+        }
+    }
 
     bitstream_t bs;
-    if (bs_load(&bs, bitfile) < 0) {
+    if (fpga_bs_load(&bs, bitfile) < 0) {
         fprintf(stderr, "Error: cannot load bitstream %s\n", bitfile);
         return 1;
     }
 
     fpga_t fpga;
-    if (bs_apply(&fpga, &bs) != 0) {
+    if (fpga_bs_apply(&fpga, &bs) != 0) {
         fprintf(stderr, "Error: cannot apply bitstream\n");
         return 1;
+    }
+
+    if (init_str) {
+        char buf[512];
+        strncpy(buf, init_str, sizeof(buf) - 1);
+        buf[sizeof(buf) - 1] = '\0';
+        char *tok = strtok(buf, ",");
+        while (tok) {
+            char *eq = strchr(tok, '=');
+            if (eq) {
+                *eq = '\0';
+                int wire = atoi(tok);
+                int val = atoi(eq + 1);
+                if (wire >= 0 && wire < MAX_WIRES)
+                    fpga.wires[wire] = (uint8_t)val;
+            }
+            tok = strtok(NULL, ",");
+        }
     }
 
     FILE *out = outfile ? fopen(outfile, "w") : stdout;
@@ -682,19 +645,21 @@ int main(int argc, char **argv) {
             bitfile, bs.rows, bs.cols, cycles);
 
     fprintf(out, "cycle clk ");
-    for (int i = 0; i < 8; i++) fprintf(out, "pin%d ", i);
-    for (int i = 0; i < 8; i++) fprintf(out, "wire%d ", i + 8);
+    int n_pins = 0;
+    for (int i = 0; i < MAX_PINS; i++) {
+        if (fpga.io_pins[i].values[0] != 0 || i == 0) {
+            fprintf(out, "p%d ", i);
+            n_pins = i + 1;
+        }
+    }
     fprintf(out, "\n");
 
     for (int cycle = 0; cycle < cycles; cycle++) {
         fpga_cycle(&fpga);
         fprintf(out, "%5d %3d ", cycle, fpga.clk);
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < n_pins; i++) {
             uint8_t w = fpga.io_pins[i].values[0];
             fprintf(out, "%4d ", fpga.wires[w]);
-        }
-        for (int i = 0; i < 8; i++) {
-            fprintf(out, "%4d ", fpga.wires[i + 8]);
         }
         fprintf(out, "\n");
     }
@@ -702,3 +667,5 @@ int main(int argc, char **argv) {
     if (out != stdout) fclose(out);
     return 0;
 }
+
+#endif /* FPGA_STANDALONE */

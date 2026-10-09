@@ -1,5 +1,6 @@
 #include "cpu.h"
 #include "opcodes.h"
+#include "fpga_hw.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -202,6 +203,24 @@ int selftest(void)
     expect("ecall priv", cpu.priv, PRIV_M);
     cpu_step(&cpu);
     expect("trap vector addi", cpu.regs[18], 99);
+
+    {
+        FILE *f = fopen("/tmp/counter4.bit", "r");
+        if (f) {
+            fpga_bitstream_t bs;
+            if (fpga_bs_load(&bs, "/tmp/counter4.bit") >= 0) {
+                fpga_bs_apply(&cpu.bus.fpga, &bs);
+                cpu.bus.fpga_loaded = 1;
+                uint64_t pin0 = 0, pin1 = 0, pin2 = 0, pin3 = 0;
+                (void)bus_load(&cpu.bus, FPGA_MMIO_BASE, 8, &pin0);
+                (void)bus_load(&cpu.bus, FPGA_MMIO_BASE + 0x100, 8, &pin1);
+                (void)bus_load(&cpu.bus, FPGA_MMIO_BASE + 0x200, 8, &pin2);
+                (void)bus_load(&cpu.bus, FPGA_MMIO_BASE + 0x300, 8, &pin3);
+                expect("fpga counter4 after 4 cycles", pin0 | (pin1 << 1) | (pin2 << 2) | (pin3 << 3), 1);
+            }
+            fclose(f);
+        }
+    }
 
     cpu_destroy(&cpu);
     if (g_fail == 0)

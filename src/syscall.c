@@ -9,16 +9,6 @@
 #include <errno.h>
 #include <string.h>
 
-#define SYS_WRITE   64
-#define SYS_READ    63
-#define SYS_EXIT    93
-#define SYS_BRK     214
-#define SYS_OPEN    1024
-#define SYS_CLOSE   57
-#define SYS_FSTAT   80
-#define SYS_LSEEK   62
-#define SYS_SPAWN   400
-
 static int host_fd_map[16];
 static int host_fd_count = 3;
 
@@ -131,12 +121,12 @@ static uint64_t do_fstat(CPU *cpu, uint64_t fd, uint64_t statbuf) {
     buf[7] = (uint64_t)stbuf.st_size;
     buf[8] = (uint64_t)stbuf.st_blksize;
     buf[9] = (uint64_t)stbuf.st_blocks;
-    buf[10] = (uint64_t)stbuf.st_atim.tv_sec;
-    buf[11] = (uint64_t)stbuf.st_atim.tv_nsec;
-    buf[12] = (uint64_t)stbuf.st_mtim.tv_sec;
-    buf[13] = (uint64_t)stbuf.st_mtim.tv_nsec;
-    buf[14] = (uint64_t)stbuf.st_ctim.tv_sec;
-    buf[15] = (uint64_t)stbuf.st_ctim.tv_nsec;
+    buf[10] = (uint64_t)stbuf.st_atime;
+    buf[11] = 0;
+    buf[12] = (uint64_t)stbuf.st_mtime;
+    buf[13] = 0;
+    buf[14] = (uint64_t)stbuf.st_ctime;
+    buf[15] = 0;
     
     Trap t = cpu_store_bytes(cpu, statbuf, (uint8_t*)buf, sizeof(buf));
     if (t.taken) return (uint64_t)(-EFAULT);
@@ -173,6 +163,24 @@ static uint64_t do_spawn(CPU *cpu, uint64_t pathname) {
     return 0;  /* Return 0 for success (placeholder) */
 }
 
+static uint64_t do_fpga_load(CPU *cpu, uint64_t path_addr, uint64_t load_addr) {
+    (void)cpu;
+    (void)load_addr;
+    char path[256];
+    Trap t = cpu_load_string(cpu, path_addr, path, 256);
+    if (t.taken) {
+        return (uint64_t)(-EFAULT);
+    }
+    if (fpga_bs_load(&cpu->bus.fpga_bs, path) < 0) {
+        return (uint64_t)(-ENOENT);
+    }
+    if (fpga_bs_apply(&cpu->bus.fpga, &cpu->bus.fpga_bs) != 0) {
+        return (uint64_t)(-EINVAL);
+    }
+    cpu->bus.fpga_loaded = 1;
+    return 0;
+}
+
 uint64_t syscall_handle(CPU *cpu, uint64_t a7, uint64_t a0, uint64_t a1, uint64_t a2,
                         uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6) {
     (void)a3; (void)a4; (void)a5; (void)a6;
@@ -191,6 +199,7 @@ uint64_t syscall_handle(CPU *cpu, uint64_t a7, uint64_t a0, uint64_t a1, uint64_
         case SYS_LSEEK:   return do_lseek(a0, a1, a2);
         case SYS_BRK:     return do_brk(cpu);
         case SYS_SPAWN:   return do_spawn(cpu, a0);
+        case SYS_FPGA_LOAD: return do_fpga_load(cpu, a0, a1);
         case SYS_EXIT:    cpu->halt = 1; cpu->halt_code = a0; return 0;
         default:          return (uint64_t)(-ENOSYS);
     }

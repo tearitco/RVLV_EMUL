@@ -1,0 +1,146 @@
+slit s0, "test.asm"
+
+pass2_loop:
+    lw x1, 1(x0)
+    sread s1, x1, s0
+    slen x2, s1
+    beq x2, x0, pass2_done
+    strim s1, s1
+    slen x2, s1
+    beq x2, x0, pass2_next
+
+    sfind x3, s1, "addi"
+    addi x4, x3, 1
+    beq x4, x0, not_addi
+    li x5, 99
+    builtin_out x5
+    j write_inst
+
+not_addi:
+    sfind x3, s1, "ecall"
+    addi x4, x3, 1
+    beq x4, x0, not_ecall
+    li x1, 500
+    builtin_out x1
+    j write_inst
+
+not_ecall:
+    sfind x3, s1, "ret"
+    addi x4, x3, 1
+    beq x4, x0, not_ret
+    li x1, 600
+    builtin_out x1
+    j write_inst
+
+not_ret:
+    sfind x3, s1, "sw"
+    addi x4, x3, 1
+    beq x4, x0, not_sw
+    li x1, 300
+    builtin_out x1
+    j write_inst
+
+not_sw:
+    sfind x3, s1, "lw"
+    addi x4, x3, 1
+    beq x4, x0, not_lw
+    li x1, 400
+    builtin_out x1
+    j write_inst
+
+not_lw:
+    sfind x3, s1, "add"
+    addi x4, x3, 1
+    beq x4, x0, not_add
+    li x1, 100
+    builtin_out x1
+    j write_inst
+
+not_add:
+    sfind x3, s1, "sub"
+    addi x4, x3, 1
+    beq x4, x0, not_sub
+    li x1, 300
+    builtin_out x1
+    j write_inst
+
+not_sub:
+    sfind x3, s1, "mul"
+    addi x4, x3, 1
+    beq x4, x0, not_mul
+    li x1, 0x02000033
+    builtin_out x1
+    j write_inst
+
+not_mul:
+    sfind x3, s1, "slt"
+    addi x4, x3, 1
+    beq x4, x0, not_slt
+    li x1, 0x00000033
+    builtin_out x1
+    j write_inst
+
+not_slt:
+    sfind x3, s1, "li"
+    addi x4, x3, 1
+    beq x4, x0, not_li
+    li x1, 0x00000013
+    builtin_out x1
+    j write_inst
+
+not_li:
+    sfind x3, s1, "beq"
+    addi x4, x3, 1
+    beq x4, x0, not_beq
+    li x1, 0x00000063
+    builtin_out x1
+    j write_inst
+
+not_beq:
+    sfind x3, s1, "bne"
+    addi x4, x3, 1
+    beq x4, x0, not_bne
+    li x1, 0x00000063
+    builtin_out x1
+    j write_inst
+
+not_bne:
+    sfind x3, s1, "j"
+    addi x4, x3, 1
+    beq x4, x0, not_j
+    li x1, 0x0000006F
+    builtin_out x1
+    j write_inst
+
+not_j:
+    sfind x3, s1, "ecall"
+    addi x4, x3, 1
+    beq x4, x0, not_ecall
+    li x1, 0x00000073
+    builtin_out x1
+    j write_inst
+
+not_ecall:
+    sfind x3, s1, "ret"
+    addi x4, x3, 1
+    beq x4, x0, not_ret
+    li x1, 0x00008067
+    builtin_out x1
+    j write_inst
+
+not_ret:
+    j next
+
+write_inst:
+    li x5, 99
+    builtin_out x5
+    j next
+
+next:
+    lw x1, 1(x0)
+    addi x1, x1, 1
+    sw x1, 1(x0)
+    j pass2_loop
+
+pass2_done:
+    halt

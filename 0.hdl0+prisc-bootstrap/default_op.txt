@@ -1,0 +1,3 @@
+# Minimal ops file for prisc+x testing
+builtin_out builtin_out builtin_out {Print register value}
+builtin_halt builtin_halt builtin_halt {Halt VM}

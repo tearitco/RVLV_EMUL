@@ -223,8 +223,11 @@ static int bare_mode(const CPU *cpu, int access)
 
 Trap cpu_load(CPU *cpu, uint64_t addr, uint64_t bits, uint64_t *out)
 {
-    if (bare_mode(cpu, ACC_LOAD) && dram_in_range(&cpu->bus.dram, addr, bits / 8))
-        return dram_load(&cpu->bus.dram, addr, bits, out);
+    if (bare_mode(cpu, ACC_LOAD)) {
+        addr &= 0xffffffffULL;
+        if (dram_in_range(&cpu->bus.dram, addr, bits / 8))
+            return dram_load(&cpu->bus.dram, addr, bits, out);
+    }
     uint64_t pa = 0;
     Trap t = cpu_mmu_translate(cpu, addr, ACC_LOAD, &pa);
     if (t.taken) {
@@ -240,8 +243,11 @@ Trap cpu_load(CPU *cpu, uint64_t addr, uint64_t bits, uint64_t *out)
 Trap cpu_store(CPU *cpu, uint64_t addr, uint64_t bits, uint64_t value)
 {
     cpu->reservation_valid = 0;
-    if (bare_mode(cpu, ACC_STORE) && dram_in_range(&cpu->bus.dram, addr, bits / 8))
-        return dram_store(&cpu->bus.dram, addr, bits, value);
+    if (bare_mode(cpu, ACC_STORE)) {
+        addr &= 0xffffffffULL;
+        if (dram_in_range(&cpu->bus.dram, addr, bits / 8))
+            return dram_store(&cpu->bus.dram, addr, bits, value);
+    }
     uint64_t pa = 0;
     Trap t = cpu_mmu_translate(cpu, addr, ACC_STORE, &pa);
     if (t.taken) {

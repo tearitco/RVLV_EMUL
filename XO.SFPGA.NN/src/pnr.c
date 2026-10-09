@@ -280,7 +280,17 @@ static int parse_hdl0(ctx_t *ctx, const char *filename) {
             pin_t *pin = &ctx->pins[ctx->n_pins++];
             strncpy(pin->name, name, MAX_NAME - 1);
             pin->pin_id = ctx->n_pins - 1;
+            /* Infer direction: input if name matches a LUT input, output otherwise */
             pin->dir = 1;
+            for (int i = 0; i < ctx->n_luts; i++) {
+                for (int j = 0; j < ctx->luts[i].n_inputs && j < MAX_LUT_INPUTS; j++) {
+                    if (strcmp(name, ctx->luts[i].inputs[j]) == 0) {
+                        pin->dir = 0;
+                        break;
+                    }
+                }
+                if (pin->dir == 0) break;
+            }
             strncpy(pin->signal, sig, MAX_NAME - 1);
             continue;
         }
@@ -345,6 +355,10 @@ static int emit_bitstream(ctx_t *ctx, const char *filename) {
     FILE *f = fopen(filename, "w");
     if (!f) return -1;
 
+    /* Pre-resolve all PIN signal names so they share wire IDs with LUT inputs */
+    for (int i = 0; i < ctx->n_pins; i++)
+        resolve_signal(ctx, ctx->pins[i].signal);
+
     fprintf(f, "# xo-sfpga bitstream v1 (emitted by pnr)\n");
     fprintf(f, "# source: HDL0\n");
     fprintf(f, ".FABRIC %d %d\n", ctx->rows, ctx->cols);
@@ -365,6 +379,9 @@ static int emit_bitstream(ctx_t *ctx, const char *filename) {
         }
         fprintf(f, " %d {", out_wire);
         int tt_count = 16;
+        fprintf(stderr, "DEBUG: emit LUT out_wire=%d n_in=%d tt[0]=%d tt[1]=%d tt[5]=%d tt[10]=%d\n",
+            out_wire, n_in, lut->truth_table[0], lut->truth_table[1], 
+            lut->truth_table[5], lut->truth_table[10]);
         for (int j = 0; j < tt_count; j++) {
             fprintf(f, "%d%s", lut->truth_table[j], j < tt_count - 1 ? "," : "");
         }

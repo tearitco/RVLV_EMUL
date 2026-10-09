@@ -1,21 +1,93 @@
-# 8-bit ALU supporting add, sub, and, or, xor, slt
-# Uses 4-LUT for function decode + carry chain for arithmetic
+# 8-bit ALU: AND, OR, XOR, NOT A, ADD, SUB, SLT
+# fn = fn2:fn1:fn0
+#   000: AND  (a & b)
+#   001: OR   (a | b)
+#   010: XOR  (a ^ b)
+#   011: NOT A (~a)
+#   100: ADD  (a + b)
+#   101: SUB  (a - b)
+#   110: SLT  (a < b, signed: result[0]=1 if a<b, rest=0)
 
-.LUT alu_c0 [rs0b0, fn0, fn1, fn2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-.LUT alu_c1 [rs0b1, fn0, fn1, fn2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-.LUT alu_c2 [rs0b2, fn0, fn1, fn2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-.LUT alu_c3 [rs0b3, fn0, fn1, fn2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-.LUT alu_c4 [rs0b4, fn0, fn1, fn2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-.LUT alu_c5 [rs0b5, fn0, fn1, fn2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-.LUT alu_c6 [rs0b6, fn0, fn1, fn2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-.LUT alu_c7 [rs0b7, fn0, fn1, fn2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+# --- Stage 1: B modifier ---
+# Invert b when fn=SUB(101) or SLT(110), pass-through for ADD(100) and bitwise
+.LUT b_mod0 [b_bit0, fn0, fn1, fn2] = {0,1,0,1,0,1,0,1,0,1,1,0,1,0,1,0}
+.LUT b_mod1 [b_bit1, fn0, fn1, fn2] = {0,1,0,1,0,1,0,1,0,1,1,0,1,0,1,0}
+.LUT b_mod2 [b_bit2, fn0, fn1, fn2] = {0,1,0,1,0,1,0,1,0,1,1,0,1,0,1,0}
+.LUT b_mod3 [b_bit3, fn0, fn1, fn2] = {0,1,0,1,0,1,0,1,0,1,1,0,1,0,1,0}
+.LUT b_mod4 [b_bit4, fn0, fn1, fn2] = {0,1,0,1,0,1,0,1,0,1,1,0,1,0,1,0}
+.LUT b_mod5 [b_bit5, fn0, fn1, fn2] = {0,1,0,1,0,1,0,1,0,1,1,0,1,0,1,0}
+.LUT b_mod6 [b_bit6, fn0, fn1, fn2] = {0,1,0,1,0,1,0,1,0,1,1,0,1,0,1,0}
+.LUT b_mod7 [b_bit7, fn0, fn1, fn2] = {0,1,0,1,0,1,0,1,0,1,1,0,1,0,1,0}
 
-.PIN alu_out0 = alu_c0.out
-.PIN alu_out1 = alu_c1.out
-.PIN alu_out2 = alu_c2.out
-.PIN alu_out3 = alu_c3.out
-.PIN alu_out4 = alu_c4.out
-.PIN alu_out5 = alu_c5.out
-.PIN alu_out6 = alu_c6.out
-.PIN alu_out7 = alu_c7.out
-.PIN alu_carry = carry_chain.out
+# --- Stage 2: Carry-in ---
+# Initial carry = 1 for SUB and SLT (two's complement), 0 for ADD
+.LUT carry_in [fn0, fn1, fn2] = {0,0,0,0,0,1,1,1}
+
+# --- Stage 3: Carry chain ---
+# carry_out = (a & b_mod) | (carry_in & (a ^ b_mod))
+.LUT carry_0 [a_bit0, b_mod0.out, carry_in.out] = {0,0,0,1,0,1,1,1}
+.LUT carry_1 [a_bit1, b_mod1.out, carry_0.out] = {0,0,0,1,0,1,1,1}
+.LUT carry_2 [a_bit2, b_mod2.out, carry_1.out] = {0,0,0,1,0,1,1,1}
+.LUT carry_3 [a_bit3, b_mod3.out, carry_2.out] = {0,0,0,1,0,1,1,1}
+.LUT carry_4 [a_bit4, b_mod4.out, carry_3.out] = {0,0,0,1,0,1,1,1}
+.LUT carry_5 [a_bit5, b_mod5.out, carry_4.out] = {0,0,0,1,0,1,1,1}
+.LUT carry_6 [a_bit6, b_mod6.out, carry_5.out] = {0,0,0,1,0,1,1,1}
+.LUT carry_7 [a_bit7, b_mod7.out, carry_6.out] = {0,0,0,1,0,1,1,1}
+
+# --- Stage 4: Sum (arithmetic result) ---
+# sum = a ^ b_mod ^ carry_in
+.LUT sum_0 [a_bit0, b_mod0.out, carry_in.out] = {0,1,1,0,1,0,0,1}
+.LUT sum_1 [a_bit1, b_mod1.out, carry_0.out] = {0,1,1,0,1,0,0,1}
+.LUT sum_2 [a_bit2, b_mod2.out, carry_1.out] = {0,1,1,0,1,0,0,1}
+.LUT sum_3 [a_bit3, b_mod3.out, carry_2.out] = {0,1,1,0,1,0,0,1}
+.LUT sum_4 [a_bit4, b_mod4.out, carry_3.out] = {0,1,1,0,1,0,0,1}
+.LUT sum_5 [a_bit5, b_mod5.out, carry_4.out] = {0,1,1,0,1,0,0,1}
+.LUT sum_6 [a_bit6, b_mod6.out, carry_5.out] = {0,1,1,0,1,0,0,1}
+.LUT sum_7 [a_bit7, b_mod7.out, carry_6.out] = {0,1,1,0,1,0,0,1}
+
+# --- Stage 5: Bitwise operations (fn2=0) ---
+# tt indexed by [a_bit, b_bit, fn0, fn1]: AND(00), OR(01), XOR(10), NOT A(11)
+.LUT bitwise0 [a_bit0, b_bit0, fn0, fn1] = {0,0,0,1,0,1,1,1,0,1,1,0,1,0,1,0}
+.LUT bitwise1 [a_bit1, b_bit1, fn0, fn1] = {0,0,0,1,0,1,1,1,0,1,1,0,1,0,1,0}
+.LUT bitwise2 [a_bit2, b_bit2, fn0, fn1] = {0,0,0,1,0,1,1,1,0,1,1,0,1,0,1,0}
+.LUT bitwise3 [a_bit3, b_bit3, fn0, fn1] = {0,0,0,1,0,1,1,1,0,1,1,0,1,0,1,0}
+.LUT bitwise4 [a_bit4, b_bit4, fn0, fn1] = {0,0,0,1,0,1,1,1,0,1,1,0,1,0,1,0}
+.LUT bitwise5 [a_bit5, b_bit5, fn0, fn1] = {0,0,0,1,0,1,1,1,0,1,1,0,1,0,1,0}
+.LUT bitwise6 [a_bit6, b_bit6, fn0, fn1] = {0,0,0,1,0,1,1,1,0,1,1,0,1,0,1,0}
+.LUT bitwise7 [a_bit7, b_bit7, fn0, fn1] = {0,0,0,1,0,1,1,1,0,1,1,0,1,0,1,0}
+
+# --- Stage 6: SLT detection ---
+# For signed comparison a < b:
+#   If signs differ (a_bit7 ^ b_bit7): a < b iff a_bit7 = 1 (a is negative)
+#   If signs same: a < b iff (a - b) is negative, i.e. sum_7 = 1
+.LUT slt_result [a_bit7, b_bit7, sum_7.out] = {0,1,0,0,1,1,0,1}
+
+# Mux arithmetic result for bit 0: sum_0 (ADD/SUB) or slt_result (SLT)
+.LUT arith0 [sum_0.out, slt_result.out, fn1] = {0,1,0,1,0,0,1,1}
+
+# --- Stage 7: Result mux ---
+# Bit 0: selects bitwise (fn2=0) or arithmetic [sum_0 for ADD/SUB, slt_result for SLT]
+.LUT result0 [bitwise0.out, arith0.out, fn2] = {0,1,0,1,0,0,1,1}
+
+# Bits 1-7: selects bitwise (fn2=0), sum (fn2=1,fn1=0), or 0 (SLT: fn2=1,fn1=1)
+# tt indexed by [bitwise, sum, fn2, fn1]:
+#   00xx: bitwise, 01xx: bitwise, 1000: bitwise, 1001: sum, 1010: sum, 1011: sum, 11xx: 0 (SLT)
+.LUT result1 [bitwise1.out, sum_1.out, fn2, fn1] = {0,1,0,1,0,0,1,1,0,1,0,1,0,0,0,0}
+.LUT result2 [bitwise2.out, sum_2.out, fn2, fn1] = {0,1,0,1,0,0,1,1,0,1,0,1,0,0,0,0}
+.LUT result3 [bitwise3.out, sum_3.out, fn2, fn1] = {0,1,0,1,0,0,1,1,0,1,0,1,0,0,0,0}
+.LUT result4 [bitwise4.out, sum_4.out, fn2, fn1] = {0,1,0,1,0,0,1,1,0,1,0,1,0,0,0,0}
+.LUT result5 [bitwise5.out, sum_5.out, fn2, fn1] = {0,1,0,1,0,0,1,1,0,1,0,1,0,0,0,0}
+.LUT result6 [bitwise6.out, sum_6.out, fn2, fn1] = {0,1,0,1,0,0,1,1,0,1,0,1,0,0,0,0}
+.LUT result7 [bitwise7.out, sum_7.out, fn2, fn1] = {0,1,0,1,0,0,1,1,0,1,0,1,0,0,0,0}
+
+# Output pins
+.PIN alu_out0 = result0.out
+.PIN alu_out1 = result1.out
+.PIN alu_out2 = result2.out
+.PIN alu_out3 = result3.out
+.PIN alu_out4 = result4.out
+.PIN alu_out5 = result5.out
+.PIN alu_out6 = result6.out
+.PIN alu_out7 = result7.out
+.PIN alu_carry = carry_7.out
+.END

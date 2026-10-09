@@ -6,6 +6,10 @@
 #include "clint.h"
 #include "plic.h"
 #include "virtio.h"
+#include "fpga_hw.h"
+
+#define FPGA_MMIO_BASE  0x40000000ULL
+#define FPGA_MMIO_SIZE  0x10000000ULL
 
 typedef struct BUS {
     DRAM dram;
@@ -13,6 +17,9 @@ typedef struct BUS {
     CLINT clint;
     PLIC plic;
     VIRTIO virtio;
+    fpga_t fpga;
+    fpga_bitstream_t fpga_bs;
+    int fpga_loaded;
     int test_exit;
     int test_code;
 } BUS;

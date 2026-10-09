@@ -1,0 +1,74 @@
+slit s0, "test.asm"
+
+pass2_loop:
+    lw x1, 1(x0)
+    sread s1, x1, s0
+    slen x2, s1
+    beq x2, x0, pass2_done
+    strim s1, s1
+    slen x2, s1
+    beq x2, x0, pass2_next
+
+    sfind x3, s1, "addi"
+    addi x4, x3, 1
+    beq x4, x0, not_addi
+    li x1, 100
+    builtin_out x1
+    j next
+
+not_addi:
+    sfind x3, s1, "li"
+    addi x4, x3, 1
+    beq x4, x0, not_li
+    li x1, 200
+    builtin_out x1
+    j next
+
+not_li:
+    sfind x3, s1, "sw"
+    addi x4, x3, 1
+    beq x4, x0, not_sw
+    li x1, 300
+    builtin_out x1
+    j next
+
+not_sw:
+    sfind x3, s1, "lw"
+    addi x4, x3, 1
+    beq x4, x0, not_lw
+    li x1, 400
+    builtin_out x1
+    j next
+
+not_lw:
+    sfind x3, s1, "ecall"
+    addi x4, x3, 1
+    beq x4, x0, not_ecall
+    li x1, 500
+    builtin_out x1
+    j next
+
+not_ecall:
+    sfind x3, s1, "ret"
+    addi x4, x3, 1
+    beq x4, x0, not_ret
+    li x1, 600
+    builtin_out x1
+    j next
+
+not_ret:
+    sfind x3, s1, "addi"
+    addi x4, x3, 1
+    beq x4, x0, next
+    li x1, 700
+    builtin_out x1
+    j next
+
+next:
+    lw x1, 1(x0)
+    addi x1, x1, 1
+    sw x1, 1(x0)
+    j pass2_loop
+
+pass2_done:
+    halt

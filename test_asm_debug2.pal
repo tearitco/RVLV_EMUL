@@ -1,0 +1,384 @@
+slit s0, "test.asm"
+
+pass2_loop:
+    lw x1, 1(x0)
+    sread s1, x1, s0
+    slen x2, s1
+    beq x2, x0, pass2_done
+    strim s1, s1
+    slen x2, s1
+    beq x2, x0, pass2_next
+
+    # Debug: print line length
+    builtin_out x2
+
+    sfind x3, s1, "addi sp, sp, -32"
+    addi x4, x3, 1
+    beq x4, x0, not_addi
+    li x5, 99
+    builtin_out x5
+    j next
+
+not_addi:
+    sfind x3, s1, "sw ra, 28(sp)"
+    addi x4, x3, 1
+    beq x4, x0, not_sw
+    li x5, 77
+    builtin_out x5
+    j next
+
+not_sw:
+    sfind x3, s1, "li x10, 10"
+    addi x4, x3, 1
+    beq x4, x0, not_li
+    li x5, 88
+    builtin_out x5
+    j next
+
+not_li:
+    sfind x3, s1, "sw x10, -4(sp)"
+    addi x4, x3, 1
+    beq x4, x0, not_sw2
+    li x5, 77
+    builtin_out x5
+    j next
+
+not_sw2:
+    sfind x3, s1, "li x10, 0"
+    addi x4, x3, 1
+    beq x4, x0, not_li2
+    li x5, 88
+    builtin_out x5
+    j next
+
+not_li2:
+    sfind x3, s1, "sw x10, -12(sp)"
+    addi x4, x3, 1
+    beq x4, x0, not_sw3
+    li x5, 77
+    builtin_out x5
+    j next
+
+not_sw3:
+    sfind x3, s1, "loop_start:"
+    addi x4, x3, 1
+    beq x4, x0, not_label
+    li x5, 77
+    builtin_out x5
+    j next
+
+not_label:
+    sfind x3, s1, "lw x10, -12(sp)"
+    addi x4, x3, 1
+    beq x4, x0, not_lw
+    li x5, 66
+    builtin_out x5
+    j next
+
+not_lw:
+    sfind x3, s1, "li x11, 3"
+    addi x4, x3, 1
+    beq x4, x0, not_li
+    li x5, 88
+    builtin_out x5
+    j next
+
+not_li:
+    sfind x3, s1, "slt x12, x10, x11"
+    addi x4, x3, 1
+    beq x4, x0, not_slt
+    li x5, 55
+    builtin_out x5
+    j next
+
+not_slt:
+    sfind x3, s1, "bne x12, x0, loop_body"
+    addi x4, x3, 1
+    beq x4, x0, not_bne
+    li x5, 44
+    builtin_out x5
+    j next
+
+not_bne:
+    sfind x3, s1, "j loop_end"
+    addi x4, x3, 1
+    beq x4, x0, not_j
+    li x5, 33
+    builtin_out x5
+    j next
+
+not_j:
+    sfind x3, s1, "loop_start:"
+    addi x4, x3, 1
+    beq x4, x0, not_label2
+    li x5, 77
+    builtin_out x5
+    j next
+
+not_label2:
+    sfind x3, s1, "addi x10, x10, 48"
+    addi x4, x3, 1
+    beq x4, x0, not_addi2
+    li x5, 88
+    builtin_out x5
+    j next
+
+not_addi2:
+    sfind x3, s1, "li x11, 268435456"
+    addi x4, x3, 1
+    beq x4, x0, not_li
+    li x5, 88
+    builtin_out x5
+    j next
+
+not_li:
+    sfind x3, s1, "sw x10, 0(x11)"
+    addi x4, x3, 1
+    beq x4, x0, not_sw2
+    li x5, 77
+    builtin_out x5
+    j next
+
+not_sw2:
+    sfind x3, s1, "lw x10, -12(sp)"
+    addi x4, x3, 1
+    beq x4, x0, not_lw2
+    li x5, 66
+    builtin_out x5
+    j next
+
+not_lw2:
+    sfind x3, s1, "li x11, 1"
+    addi x4, x3, 1
+    beq x4, x0, not_li2
+    li x5, 88
+    builtin_out x5
+    j next
+
+not_li2:
+    sfind x3, s1, "add x10, x10, x11"
+    addi x4, x3, 1
+    beq x4, x0, not_add
+    li x5, 55
+    builtin_out x5
+    j next
+
+not_add:
+    sfind x3, s1, "sw x10, -12(sp)"
+    addi x4, x3, 1
+    beq x4, x0, not_sw4
+    li x5, 77
+    builtin_out x5
+    j next
+
+not_sw4:
+    sfind x3, s1, "j loop_start"
+    addi x4, x3, 1
+    beq x4, x0, not_j
+    li x5, 33
+    builtin_out x5
+    j next
+
+not_j:
+    sfind x3, s1, "loop_end:"
+    addi x4, x3, 1
+    beq x4, x0, not_label2
+    li x5, 77
+    builtin_out x5
+    j next
+
+not_label2:
+    sfind x3, s1, "li x10, 10"
+    addi x4, x3, 1
+    beq x4, x0, not_li2
+    li x5, 88
+    builtin_out x5
+    j next
+
+not_li2:
+    sfind x3, s1, "sw x10, -4(sp)"
+    addi x4, x3, 1
+    beq x4, x0, not_sw5
+    li x5, 77
+    builtin_out x5
+    j next
+
+not_sw5:
+    sfind x3, s1, "lw x10, -4(sp)"
+    addi x4, x3, 1
+    beq x4, x0, not_lw2
+    li x5, 66
+    builtin_out x5
+    j next
+
+not_lw2:
+    sfind x3, s1, "li x11, 5"
+    addi x4, x3, 1
+    beq x4, x0, not_li3
+    li x5, 88
+    builtin_out x5
+    j next
+
+not_li3:
+    sfind x3, s1, "slt x12, x11, x10"
+    addi x4, x3, 1
+    beq x4, x0, not_slt
+    li x5, 55
+    builtin_out x5
+    j next
+
+not_slt:
+    sfind x3, s1, "beq x12, x0, if_else"
+    addi x4, x3, 1
+    beq x4, x0, not_beq
+    li x5, 44
+    builtin_out x5
+    j next
+
+not_beq:
+    sfind x3, s1, "li x10, 1"
+    addi x4, x3, 1
+    beq x4, x0, not_li4
+    li x5, 88
+    builtin_out x5
+    j next
+
+not_li4:
+    sfind x3, s1, "addi x10, x10, 48"
+    addi x4, x3, 1
+    beq x4, x0, not_addi3
+    li x5, 88
+    builtin_out x5
+    j next
+
+not_addi3:
+    sfind x3, s1, "li x11, 268435456"
+    addi x4, x3, 1
+    beq x4, x0, not_li5
+    li x5, 88
+    builtin_out x5
+    j next
+
+not_li5:
+    sfind x3, s1, "sw x10, 0(x11)"
+    addi x4, x3, 1
+    beq x4, x0, not_sw6
+    li x5, 77
+    builtin_out x5
+    j next
+
+not_sw6:
+    sfind x3, s1, "j if_end"
+    addi x4, x3, 1
+    beq x4, x0, not_j2
+    li x5, 33
+    builtin_out x5
+    j next
+
+not_j2:
+    sfind x3, s1, "if_else:"
+    addi x4, x3, 1
+    beq x4, x0, not_label3
+    li x5, 77
+    builtin_out x5
+    j next
+
+not_label3:
+    sfind x3, s1, "li x10, 0"
+    addi x4, x3, 1
+    beq x4, x0, not_li6
+    li x5, 88
+    builtin_out x5
+    j next
+
+not_li6:
+    sfind x3, s1, "addi x10, x10, 48"
+    addi x4, x3, 1
+    beq x4, x0, not_addi4
+    li x5, 88
+    builtin_out x5
+    j next
+
+not_addi4:
+    sfind x3, s1, "li x11, 268435456"
+    addi x4, x3, 1
+    beq x4, x0, not_li7
+    li x5, 88
+    builtin_out x5
+    j next
+
+not_li7:
+    sfind x3, s1, "sw x10, 0(x11)"
+    addi x4, x3, 1
+    beq x4, x0, not_sw7
+    li x5, 77
+    builtin_out x5
+    j next
+
+not_sw7:
+    sfind x3, s1, "if_end:"
+    addi x4, x3, 1
+    beq x4, x0, not_label4
+    li x5, 77
+    builtin_out x5
+    j next
+
+not_label4:
+    sfind x3, s1, "li x10, 1"
+    addi x4, x3, 1
+    beq x4, x0, not_li8
+    li x5, 88
+    builtin_out x5
+    j next
+
+not_li8:
+    sfind x3, s1, "li x17, 93"
+    addi x4, x3, 1
+    beq x4, x0, not_li9
+    li x5, 88
+    builtin_out x5
+    j next
+
+not_li9:
+    sfind x3, s1, "ecall"
+    addi x4, x3, 1
+    beq x4, x0, not_ecall
+    li x5, 55
+    builtin_out x5
+    j next
+
+not_ecall:
+    sfind x3, s1, "lw ra, 28(sp)"
+    addi x4, x3, 1
+    beq x4, x0, not_lw3
+    li x5, 66
+    builtin_out x5
+    j next
+
+not_lw3:
+    sfind x3, s1, "addi sp, sp, 32"
+    addi x4, x3, 1
+    beq x4, x0, not_addi3
+    li x5, 88
+    builtin_out x5
+    j next
+
+not_addi3:
+    sfind x3, s1, "ret"
+    addi x4, x3, 1
+    beq x4, x0, not_ret
+    li x5, 44
+    builtin_out x5
+    j next
+
+not_ret:
+    j next
+
+next:
+    lw x1, 1(x0)
+    addi x1, x1, 1
+    sw x1, 1(x0)
+    j pass2_loop
+
+pass2_done:
+    halt

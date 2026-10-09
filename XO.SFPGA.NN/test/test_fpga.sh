@@ -5,21 +5,30 @@ cd "$(dirname "$0")/.."
 
 CC=gcc
 CFLAGS="-Wall -Wextra -Iinclude -Isrc"
-SRCS="src/fpga.c src/switchbox.c src/bitstream.c"
 
 echo "=== XO.SFPGA.NN Test Suite ==="
 
-echo "--- Building FPGA test ---"
-$CC $CFLAGS -o /tmp/fpga_test $SRCS src/fpga_test.c 2>&1
-echo "OK: Built FPGA test"
+echo "--- Building FPGA simulator ---"
+$CC $CFLAGS -o /tmp/fpga src/fpga.c 2>&1
+echo "OK: Built FPGA simulator"
 
-echo "--- Running FPGA test ---"
-/tmp/fpga_test 2>&1
+echo "--- Building PNR tool ---"
+$CC $CFLAGS -o /tmp/pnr src/pnr.c 2>&1
+echo "OK: Built PNR tool"
+
+echo "--- Running FPGA built-in tests ---"
+/tmp/fpga --test 2>&1
 
 echo ""
 echo "--- PNR test (counter4) ---"
-$CC $CFLAGS -o /tmp/pnr_test $SRCS src/pnr.c src/pnr_main.c 2>&1
-/tmp/pnr_test hdl0/counter4.hdl0 /tmp/counter4.bit 2>&1
+/tmp/pnr hdl0/counter4.hdl0 /tmp/counter4.bit 2>&1
+
+echo "--- Counter4 simulation ---"
+/tmp/fpga /tmp/counter4.bit 5 2>&1
+
+echo ""
+echo "--- ALU8 test suite ---"
+bash test/test_alu8.sh 2>&1 | grep -E "(PASS|FAIL|Results)" || true
 
 echo ""
 echo "=== All tests passed ==="

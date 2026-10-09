@@ -1,6 +1,7 @@
 #include "bus.h"
 
 #include <string.h>
+#include <stdio.h>
 
 int bus_init(BUS *bus, uint64_t dram_size, const char *disk_path, int virtio_legacy)
 {
@@ -18,6 +19,7 @@ int bus_init(BUS *bus, uint64_t dram_size, const char *disk_path, int virtio_leg
     }
     bus->test_exit = 0;
     bus->test_code = 0;
+    bus->fpga_loaded = 0;
     return 0;
 }
 
@@ -38,6 +40,20 @@ Trap bus_load(BUS *bus, uint64_t addr, uint64_t bits, uint64_t *out)
 {
     if (!bus || !out)
         return trap_ex(EX_LOAD_ACCESS, addr);
+    if (in_range(addr, FPGA_MMIO_BASE, FPGA_MMIO_SIZE)) {
+        if (!bus->fpga_loaded) {
+            *out = 0;
+            return trap_none();
+        }
+        uint64_t pin_offset = (addr - FPGA_MMIO_BASE) / 0x100;
+        if (pin_offset < FPGA_MAX_PINS) {
+            fpga_cycle(&bus->fpga);
+            *out = fpga_get_pin(&bus->fpga, (uint8_t)pin_offset);
+            return trap_none();
+        }
+        *out = 0;
+        return trap_none();
+    }
     if (in_range(addr, UART_BASE, UART_SIZE))
         return uart_load(&bus->uart, addr, bits, out);
     if (in_range(addr, CLINT_BASE, CLINT_SIZE))
@@ -63,6 +79,17 @@ Trap bus_store(BUS *bus, uint64_t addr, uint64_t bits, uint64_t value)
 {
     if (!bus)
         return trap_ex(EX_STORE_ACCESS, addr);
+    if (in_range(addr, FPGA_MMIO_BASE, FPGA_MMIO_SIZE)) {
+        if (!bus->fpga_loaded) {
+            return trap_none();
+        }
+        uint64_t pin_offset = (addr - FPGA_MMIO_BASE) / 0x100;
+        if (pin_offset < FPGA_MAX_PINS) {
+            fpga_set_pin(&bus->fpga, (uint8_t)pin_offset, (uint8_t)value);
+            fpga_cycle(&bus->fpga);
+        }
+        return trap_none();
+    }
     if (in_range(addr, UART_BASE, UART_SIZE))
         return uart_store(&bus->uart, addr, bits, value);
     if (in_range(addr, CLINT_BASE, CLINT_SIZE))

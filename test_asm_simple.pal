@@ -1,0 +1,45 @@
+slit s0, "test.asm"
+
+pass2_loop:
+    lw x1, 1(x0)
+    sread s1, x1, s0
+    slen x2, s1
+    beq x2, x0, pass2_done
+    strim s1, s1
+    slen x2, s1
+    beq x2, x0, pass2_next
+
+    sfind x3, s1, "addi sp, sp, -32"
+    addi x4, x3, 1
+    beq x4, x0, not_addi
+    li x5, 99
+    builtin_out x5
+    j next
+
+not_addi:
+    sfind x3, s1, "sw ra, 28(sp)"
+    addi x4, x3, 1
+    beq x4, x0, not_sw
+    li x5, 77
+    builtin_out x5
+    j next
+
+not_sw:
+    sfind x3, s1, "li x10, 10"
+    addi x4, x3, 1
+    beq x4, x0, not_li
+    li x5, 88
+    builtin_out x5
+    j next
+
+not_li:
+    j next
+
+next:
+    lw x1, 1(x0)
+    addi x1, x1, 1
+    sw x1, 1(x0)
+    j pass2_loop
+
+pass2_done:
+    halt

@@ -1,10 +1,14 @@
-# 4-bit counter using LUT4 + REG cascade
-# Each LUT computes next_bit = current_bit XOR 1 (toggle every cycle)
+# 4-bit binary counter using LUT4 + REG cascade
+# LUT computes next_bit = current_bit XOR carry_in (carry chain via AND)
+# LUT0: toggle every cycle (carry_in=1)
+# LUT1: toggle when bit0 was 1 (carry from stage 0)
+# LUT2: toggle when bit0 AND bit1 were 1 (carry from stage 1)
+# LUT3: toggle when bit0 AND bit1 AND bit2 were 1 (carry from stage 2)
 
 .LUT lut0 [reg0.q, 1] = {0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0}
-.LUT lut1 [reg1.q, 1] = {0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0}
-.LUT lut2 [reg2.q, 1] = {0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0}
-.LUT lut3 [reg3.q, 1] = {0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT lut1 [reg1.q, reg0.q] = {0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT lut2 [reg2.q, reg0.q, reg1.q] = {0,1,0,1,0,1,1,0,0,0,0,0,0,0,0,0}
+.LUT lut3 [reg3.q, reg0.q, reg1.q, reg2.q] = {0,1,0,1,0,1,0,1,0,1,0,1,0,1,1,0}
 
 .REG reg0 [lut0.out] clk clk_en=1
 .REG reg1 [lut1.out] clk clk_en=1

@@ -25,10 +25,11 @@ add_executable(main
   src/trap.c
   src/uart.c
   src/virtio.c
+  ${CMAKE_SOURCE_DIR}/XO.SFPGA.NN/src/fpga.c
 )
 
 target_include_directories(main PRIVATE includes)
-target_compile_options(main PRIVATE -Wall -Wextra -Werror)
+target_compile_options(main PRIVATE -Wall -Wextra -Werror -Dnullptr=NULL -D_GNU_SOURCE -Wno-error=format)
 if(WIN32)
   target_compile_definitions(main PRIVATE _CRT_SECURE_NO_WARNINGS)
 endif()

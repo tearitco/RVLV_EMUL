@@ -1,0 +1,27 @@
+# Simple prisc+x test program
+# Tests basic arithmetic and ecall
+
+int x1, 42
+int x2, 10
+int x3, 0
+
+addi x3, x1, 0      # x3 = 42
+addi x3, x3, 5      # x3 = 47
+addi x3, x3, -10    # x3 = 37
+
+beq x3, x2, equal   # if x3 == 10, jump to equal
+j done
+
+equal:
+    addi x3, x1, 0  # x3 = 42
+
+done:
+    # Test ecall write
+    li x15, 3       # SYS_WRITE_LINE
+    li x12, 1       # stdout
+    ecall "Hello from prisc+x!"
+
+    # Test ecall exit
+    li x15, 93      # exit
+    li x10, 0       # exit code
+    ecall

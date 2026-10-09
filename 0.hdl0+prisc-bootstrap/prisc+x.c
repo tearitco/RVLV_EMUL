@@ -196,7 +196,7 @@ void handle_sigint(int sig) {
     _exit(130);  /* Immediate exit, no cleanup */
 }
 
-#define MAX_INST 1024
+#define MAX_INST 4096
 #define MAX_LABELS 128
 #define MAX_VARS 256
 #define MAX_OPS 64
