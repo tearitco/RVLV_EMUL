@@ -1,0 +1,22 @@
+# Simple prisc+x test program
+# Tests basic arithmetic and builtin ops
+
+int x1, 42
+int x2, 10
+int x3, 0
+
+addi x3, x1, 0      # x3 = 42
+addi x3, x3, 5      # x3 = 47
+addi x3, x3, -10    # x3 = 37
+
+beq x3, x2, equal   # if x3 == 10, jump to equal
+j done
+
+equal:
+    addi x3, x1, 0  # x3 = 42
+
+done:
+    # Test builtin_out
+    builtin_out x3
+
+    halt

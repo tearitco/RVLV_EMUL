@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en" lang-en="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compiler Assembler Bootstrap Pipeline — RVEM</title>
+<style>
+  body { font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace; line-height: 1.5; max-width: 1100px; margin: 0 auto; padding: 2rem; color: #1a1a1a; background: #fafafa; }
+  h1 { font-size: 1.8rem; border-bottom: 2px solid #0066cc; padding-bottom: .3rem; }
+  h2 { font-size: 1.4rem; margin-top: 2rem; border-bottom: 1px solid #ddd; padding-bottom: .2rem; }
+  h3 { font-size: 1.1rem; margin-top: 1.5rem; }
+  code { background: #eef2f7; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.9em; }
+  pre { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.85rem; line-height: 1.4; }
+  pre .c { color: #6a9955; }
+  pre .kw { color: #569cd6; }
+  pre .op { color: #d4d4d4; }
+  pre .str { color: #ce9178; }
+  pre .num { color: #b5cea8; }
+  pre .lbl { color: #ffa071; }
+  pre .cmt { color: #6a9955; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td { border: 1px solid #ddd; padding: 0.4rem 0.6rem; text-align: left; font-size: 0.9rem; }
+  th { background: #e8eef5; }
+  tr:nth-child(even) { background: #f4f6f9; }
+  .pipeline { display: flex; gap: 1rem; overflow-x: auto; padding: 1rem 0; }
+  .stage { flex: 1; min-width: 200px; background: #fff; border: 2px solid #0066cc; border-radius: 8px; padding: 1rem; text-align: center; }
+  .stage .arrow { font-size: 1.5rem; color: #666; margin: 0 .5rem; }
+  .stage-code { background: #1e1e1e; color: #d4d4d4; padding: 0.8rem; border-radius: 6px; font-size: 0.8rem; margin: 0.5rem 0; }
+  .box { border: 1px solid #ddd; border-radius: 6px; padding: 0.5rem 1rem; margin: 0.5rem 0; }
+  .bug { background: #fff3cd; border-left: 4px solid #ffc107; }
+  .fix { background: #d4edda; border-left: 4px solid #28a745; }
+  .flow-step { margin: 0.5rem 0; padding: 0.3rem 0.6rem; background: #e8f4f8; border-radius: 4px; }
+  .flow-step.final { background: #d4edda; }
+  .legend span { display: inline-block; width: 14px; height: 14px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+  .legend .reg { background: #569cd6; }
+  .legend .imm { background: #b5cea8; }
+  .legend .funct { background: #ffa071; }
+  .legend .op { background: #d4d4d4; }
+  .note { background: #fff3cd; padding: 0.8rem; border-radius: 6px; margin: 1rem 0; font-size: 0.9rem; }
+  .note strong { color: #856404; }
+</style>
+</head>
+<body>
+
+<h1>Compiler Assembler Bootstrap Pipeline</h1>
+<p><strong>Project:</strong> RVEM prisc+x — A self-hosting C compiler → assembly → binary toolchain written entirely in <code>.pal</code> VM assembly.</p>
+
+<div class="pipeline">
+  <div class="stage">
+    <div><strong>1. C Source</strong></div>
+    <div class="stage-code">c_source.c<br>int main() {<br>    int x = 5;<br>    putint(x+3);<br>    ...<br>}</div>
+  </div>
+  <div class="stage">
+    <div><strong>→</strong></div>
+    <div class="stage-code">cc.pal (.pal VM)</div>
+  </div>
+  <div class="stage">
+    <div><strong>2. Assembly Text</strong></div>
+    <div class="stage-code">/tmp/cc_out.s<br>main:<br>  addi sp,sp,-32<br>  sw ra,28(sp)<br>  ...<br>  ret</div>
+  </div>
+  <div class="stage">
+    <div><strong>→</strong></div>
+    <div class="stage-code">asm.pal (.pal VM)</div>
+  </div>
+  <div class="stage">
+    <div><strong>3. RV32I Binary</strong></div>
+    <div class="stage-code">42 encoded values<br>0xfe010113, 0x00112e23,<br>...0x00008067, 0x00000001</div>
+  </div>
+  <div class="stage">
+    <div><strong>→</strong></div>
+    <div class="stage-code">RV32I emulator<br>(build/main or QEMU)</div>
+  </div>
+  <div class="stage">
+    <div><strong>4. Execution</strong></div>
+    <div class="stage-code">Program runs,<br>outputs to console,<br>exits via ecall</div>
+  </div>
+</div>
+
+<h2>Component Architecture</h2>
+
+<h3>prisc+x VM (prisc+x.c)</h3>
+<p>The foundation VM that interprets <code>.pal</code> programs. Key constraints:</p>
+
+<table>
+  <tr><th>Resource</th><th>Limit</th></tr>
+  <tr><td>Integer registers</td><td>x0–x15 (16 total)</td></tr>
+  <tr><td>String registers</td><td>s0–s31 (4KB each)</td></tr>
+  <tr><td>Data memory (dmem)</td><td>4096 slots</td></tr>
+  <tr><td>Instruction limit</td><td>4096</td></tr>
+  <tr><td>Labels in .pal</td><td>128</td></tr>
+</table>
+
+<div class="note">
+  <strong>Critical constraint:</strong> The <code>.pal</code> VM's <code>add</code> instruction only accepts register
+  operands (<code>add rd, rs1, rs2</code>). To add an immediate value, you MUST use
+  <code>addi rd, rs1, imm</code>. Using <code>add</code> with a numeric literal silently
+  fails (sscanf doesn't match the number as a register) and becomes a no-op.
+  This was the root cause of a bug affecting 6 label-address computations.
+</div>
+
+<h3>Compiler (cc.pal)</h3>
+<p>A line-by-line pattern-matching C-to-RV32I compiler. It does NOT build a full AST — instead it matches each source line against known patterns and emits assembly directly.</p>
+
+<h3>Assembler (asm.pal)</h3>
+<p>Reads RV32I assembly text (with labels) and encodes instructions into 32-bit binary values. Uses a two-pass algorithm:</p>
+
+<div class="box">
+  <strong>Pass 1</strong>: Scan all lines, detect labels (lines containing <code>:</code>), and store the
+  byte address of each label at <code>dmem[100+label_index]</code>. The instruction counter
+  (<code>dmem[2]</code>) increments by 4 for each instruction line, but NOT for labels.
+</div>
+<div class="box">
+  <strong>Pass 2</strong>: Re-scan lines, pattern-match each instruction to determine its type,
+  compute the binary encoding (including branch/jump offsets using label addresses from dmem),
+  and output via <code>builtin_out</code>.
+</div>
+
+<h2>Label Storage and Addressing</h2>
+
+<p>Labels are stored in <code>dmem[100]</code> through <code>dmem[100+N-1]</code>, where N is the number of labels:</p>
+
+<table>
+  <tr><th>Label</th><th>Index</th><th>dmem Address</th><th>Value (test.asm)</th></tr>
+  <tr><td>loop_start</td><td>0</td><td>100</td><td>24 (byte addr of instr 6)</td></tr>
+  <tr><td>loop_body</td><td>1</td><td>101</td><td>44 (byte addr of instr 11)</td></tr>
+  <tr><td>loop_end</td><td>2</td><td>102</td><td>80 (byte addr of instr 19)</td></tr>
+  <tr><td>if_else</td><td>3</td><td>103</td><td>124 (byte addr of instr 31)</td></tr>
+  <tr><td>if_end</td><td>4</td><td>104</td><td>140 (byte addr of instr 35)</td></tr>
+</table>
+
+<h2>Branch/Jump Offset Computation</h2>
+
+<p>For branch (B-type) and jump (J-type) instructions, the offset is computed at runtime
+in <code>asm.pal</code> Pass 2:</p>
+
+<pre><span class="cmt"># B-type (branch):</span>
+lw   x6, 0(x5)      <span class="cmt"># x6 = target label address (from dmem)</span>
+lw   x7, 2(x0)      <span class="cmt"># x7 = current instruction address</span>
+sub  x8, x6, x7     <span class="cmt"># x8 = offset = target - current</span>
+
+<span class="cmt"># Extract B-type immediate fields from offset:</span>
+srli x9, x8, 12; andi x9, x9, 1   <span class="cmt"># imm[12]</span>
+srli x9, x8, 5;  andi x9, x9, 63  <span class="cmt"># imm[10:5]</span>
+srli x9, x8, 1;  andi x9, x9, 15  <span class="cmt"># imm[4:1]</span>
+srli x9, x8, 11; andi x9, x9, 1   <span class="cmt"># imm[11]</span></pre>
+
+<p>B-type layout: <code>imm[12|10:5] rs2 rs1 funct3 imm[4:1|11] opcode</code></p>
+
+<pre><span class="cmt"># J-type (jal):</span>
+<span class="cmt"># Same offset computation, different bit packing</span>
+srli x9, x8, 20; andi x9, x9, 1   <span class="cmt"># imm[20]</span>
+srli x9, x8, 12; andi x9, x9, 255 <span class="cmt"># imm[19:12]</span>
+srli x9, x8, 11; andi x9, x9, 1   <span class="cmt"># imm[11]</span>
+srli x9, x8, 1;  andi x9, x9, 1023 <span class="cmt"># imm[10:1]</span></pre>
+
+<p>J-type layout: <code>imm[20|10:5|4:1|11|19:12] rd opcode</code> (note: imm[10:1] packs bits 10:5 and 4:1 together)</p>
+
+<h3>Bug: Label Address Corruption</h3>
+
+<div class="bug">
+  <strong>Bug:</strong> In Pass 1, label address computation used <code>add x5, x5, 100</code> instead of
+  <code>addi x5, x5, 100</code>. The <code>.pal</code> VM's <code>add</code> only accepts register
+  operands — when <code>100</code> is passed as the third operand, sscanf fails to parse it as
+  a register name, leaving the destination unchanged (effectively <code>add x5, x5, x0</code>).
+</div>
+
+<div class="fix">
+  <strong>Fix:</strong> Changed all 6 occurrences to <code>addi x5, x_, 100</code> in asm.pal
+  (lines 31, 306, 338, 372, 399, 426). This ensures the base address 100 is correctly added,
+  so label addresses are stored at the right dmem locations.
+</div>
+
+<h2>RV32I Instruction Encoding Reference</h2>
+
+<p>The assembler handles these instruction types:</p>
+
+<table>
+  <tr><th>Type</th><th>Instructions</th><th>Encoding Pattern</th><th>funct3</th></tr>
+  <tr><td>I-type (immediate)</td><td><code>addi</code></td><td><code>imm[11:0] rs1 imm[11:0] opcode</code></td><td>—</td></tr>
+  <tr><td>R-type</td><td><code>add</code>, <code>sub</code>, <code>slt</code></td><td><td>—</td><td>000, 040, 010</td></tr>
+  <tr><td>S-type (store)</td><td><code>sw</code>, <code>lw</code></td><td><code>imm[11:5] rs2 rs1 funct3 imm[4:0] opcode</code></td><td>010</td></tr>
+  <tr><td>B-type (branch)</td><td><code>beq</code>, <code>bne</code></td><td><code>imm[12|10:5] rs2 rs1 funct3 imm[4:1|11] opcode</code></td><td>000, 001</td></tr>
+  <tr><td>U-type (lui)</td><td><code>lui</code></td><td><code>imm[31:12] rd opcode</code></td><td>—</td></tr>
+  <tr><td>J-type (jal)</td><td><code>j</code></td><td><code>imm[20|10:5|4:1|11|19:12] rd opcode</code></td><td>—</td></tr>
+</table>
+
+<h3>Complete Encoded Program (test.asm)</h3>
+
+<table>
+  <tr><th>#</th><th>Assembly</th><th>Encoding</th><th>Hex</th><th>Type</th></tr>
+  <tr><td>0</td><td><code>addi sp,sp,-32</code></td><td>-33488621</td><td>0xFE010113</td><td>I-type</td></tr>
+  <tr><td>1</td><td><code>sw ra,28(sp)</code></td><td>1125923</td><td>0x00112E23</td><td>S-type</td></tr>
+  <tr><td>2</td><td><code>li x10,5</code></td><td>5244179</td><td>0x00500513</td><td>I-type</td></tr>
+  <tr><td>3</td><td><code>sw x10,-4(sp)</code></td><td>-22991325</td><td>0xFEA12E23</td><td>S-type</td></tr>
+  <tr><td>4</td><td><code>li x10,0</code></td><td>1299</td><td>0x00000513</td><td>I-type</td></tr>
+  <tr><td>5</td><td><code>sw x10,-12(sp)</code></td><td>-22992349</td><td>0xFEA12A23</td><td>S-type</td></tr>
+  <tr><td>6</td><td><code>lw x10,-12(sp)</code></td><td>-12507901</td><td>0xFF412503</td><td>S-type</td></tr>
+  <tr><td>7</td><td><code>li x11,3</code></td><td>3147155</td><td>0x00300593</td><td>I-type</td></tr>
+  <tr><td>8</td><td><code>slt x12,x10,x11</code></td><td>11875891</td><td>0x00B53633</td><td>R-type</td></tr>
+  <tr><td>9</td><td><code>bne x12,x0,loop_body</code></td><td>398435</td><td>0x00061463</td><td>B-type</td></tr>
+  <tr><td>10</td><td><code>j loop_end</code></td><td>41943151</td><td>0x0280006F</td><td>J-type</td></tr>
+  <tr><td>11</td><td><code>lw x10,-12(sp)</code></td><td>-12507901</td><td>0xFF412503</td><td>S-type</td></tr>
+  <tr><td>12</td><td><code>addi x10,x10,48</code></td><td>50660627</td><td>0x03050513</td><td>I-type</td></tr>
+  <tr><td>13</td><td><code>lui x11,0x10000</code></td><td>268436919</td><td>0x100005B7</td><td>U-type</td></tr>
+  <tr><td>14</td><td><code>sw x10,0(x11)</code></td><td>10854435</td><td>0x00A5A023</td><td>S-type</td></tr>
+  <tr><td>15</td><td><code>lw x10,-12(sp)</code></td><td>-12507901</td><td>0xFF412503</td><td>S-type</td></tr>
+  <tr><td>16</td><td><code>li x11,1</code></td><td>1050003</td><td>0x00100593</td><td>I-type</td></tr>
+  <tr><td>17</td><td><code>add x10,x10,x11</code></td><td>11863347</td><td>0x00B50533</td><td>R-type</td></tr>
+  <tr><td>18</td><td><code>sw x10,-12(sp)</code></td><td>-22992349</td><td>0xFEA12A23</td><td>S-type</td></tr>
+  <tr><td>19</td><td><code>j loop_start</code></td><td>-52432785</td><td>0xFCDFF06F</td><td>J-type</td></tr>
+  <tr><td>20</td><td><code>li x10,10</code></td><td>10487059</td><td>0x00A00513</td><td>I-type</td></tr>
+  <tr><td>21</td><td><code>sw x10,-4(sp)</code></td><td>-22991325</td><td>0xFEA12E23</td><td>S-type</td></tr>
+  <tr><td>22</td><td><code>lw x10,-4(sp)</code></td><td>-4119293</td><td>0xFFC12503</td><td>S-type</td></tr>
+  <tr><td>23</td><td><code>li x11,5</code></td><td>5244307</td><td>0x00500593</td><td>I-type</td></tr>
+  <tr><td>24</td><td><code>slt x12,x11,x10</code></td><td>10860083</td><td>0x00A5B633</td><td>R-type</td></tr>
+  <tr><td>25</td><td><code>beq x12,x0,if_else</code></td><td>396387</td><td>0x00060C63</td><td>B-type</td></tr>
+  <tr><td>26</td><td><code>li x10,1</code></td><td>1049875</td><td>0x00100513</td><td>I-type</td></tr>
+  <tr><td>27</td><td><code>addi x10,x10,48</code></td><td>50660627</td><td>0x03050513</td><td>I-type</td></tr>
+  <tr><td>28</td><td><code>lui x11,0x10000</code></td><td>268436919</td><td>0x100005B7</td><td>U-type</td></tr>
+  <tr><td>29</td><td><code>sw x10,0(x11)</code></td><td>10854435</td><td>0x00A5A023</td><td>S-type</td></tr>
+  <tr><td>30</td><td><code>j if_end</code></td><td>20971631</td><td>0x0140006F</td><td>J-type</td></tr>
+  <tr><td>31</td><td><code>li x10,0</code></td><td>1299</td><td>0x00000513</td><td>I-type</td></tr>
+  <tr><td>32</td><td><code>addi x10,x10,48</code></td><td>50660627</td><td>0x03050513</td><td>I-type</td></tr>
+  <tr><td>33</td><td><code>lui x11,0x10000</code></td><td>268436919</td><td>0x100005B7</td><td>U-type</td></tr>
+  <tr><td>34</td><td><code>sw x10,0(x11)</code></td><td>10854435</td><td>0x00A5A023</td><td>S-type</td></tr>
+  <tr><td>35</td><td><code>li x10,1</code></td><td>1049875</td><td>0x00100513</td><td>I-type</td></tr>
+  <tr><td>36</td><td><code>li x17,93</code></td><td>97519763</td><td>0x05D00893</td><td>I-type</td></tr>
+  <tr><td>37</td><td><code>ecall</code></td><td>115</td><td>0x00000073</td><td>Syscall</td></tr>
+  <tr><td>38</td><td><code>lw ra,28(sp)</code></td><td>29433987</td><td>0x01C12083</td><td>S-type</td></tr>
+  <tr><td>39</td><td><code>addi sp,sp,32</code></td><td>33620243</td><td>0x02010113</td><td>I-type</td></tr>
+  <tr><td>40</td><td><code>ret</code></td><td>32871</td><td>0x00008067</td><td>JALR</td></tr>
+  <tr><td>41</td><td><code>halt</code></td><td>1</td><td>0x00000001</td><td>Halt</td></tr>
+</table>
+
+<h2>.pal VM Instruction Set</h2>
+
+<table>
+  <tr><th>Category</th><th>Instructions</th><th>Description</th></tr>
+  <tr><td rowspan="5">Arithmetic</td><td><code>addi rd,rs1,imm</code></td><td>Add immediate (signed 12-bit)</td></tr>
+  <tr><td><code>add rd,rs1,rs2</code></td><td>Add registers</td></tr>
+  <tr><td rowspan="5">Logic/Shift</td><td><code>sub rd,rs1,rs2</code></td><td>Subtract</td></tr>
+  <tr><td><code>andi rd,rs1,imm</code></td><td>Bitwise AND immediate</td></tr>
+  <tr><td><code>ori rd,rs1,imm</code></td><td>Bitwise OR immediate</td></tr>
+  <tr><td><code>xori rd,rs1,imm</code></td><td>XOR immediate</td></tr>
+  <tr><td><code>slli rd,rs1,shamt</code></td><td>Shift left logical</td></tr>
+  <tr><td rowspan="4">Comparison</td><td><code>srli rd,rs1,shamt</code></td><td>Shift right logical (unsigned!)</td></tr>
+  <tr><td><code>slt rd,rs1,rs2</code></td><td>Set less than (signed)</td></tr>
+  <tr><td><code>sltu rd,rs1,rs2</code></td><td>Set less than unsigned</td></tr>
+  <tr><td><code>sll/srl/sra</code></td><td>Shift variants</td></tr>
+  <tr><td rowspan="3">Memory</td><td><code>lw rd,off(rs1)</code></td><td>Load word</td></tr>
+  <tr><td><code>sw rs2,off(rs1)</code></td><td>Store word</td></tr>
+  <tr><td><code>li rd,imm</code></td><td>Load immediate (addi rd,x0,imm)</td></tr>
+  <tr><td rowspan="6">Control Flow</td><td><code>beq rs1,rs2,label</code></td><td>Branch if equal</td></tr>
+  <tr><td><code>bne rs1,rs2,label</code></td><td>Branch if not equal</td></tr>
+  <tr><td><code>j label</code></td><td>Unconditional jump</td></tr>
+  <tr><td><code>halt</code></td><td>Stop VM</td></tr>
+  <tr><td><code>ecall</code></td><td>Environment call</td></tr>
+  <tr><td><code>builtin_out xN</code></td><td>Print register (hex)</td></tr>
+  <tr><td rowspan="13">String Ops</td><td><code>slit sD,"str"</code></td><td>String literal</td></tr>
+  <tr><td><code>sread sD,xN,sM</code></td><td>Read line from file</td></tr>
+  <tr><td><code>sfind xD,sS,"sub"</code></td><td>Find substring (-1 if not found)</td></tr>
+  <tr><td><code>slen xD,sS</code></td><td>String length</td></tr>
+  <tr><td><code>strim sD,sS</code></td><td>Trim whitespace</td></tr>
+  <tr><td><code>sbeq sA,sB,label</code></td><td>Branch if strings equal</td></tr>
+  <tr><td><code>sbne sA,sB,label</code></td><td>Branch if strings not equal</td></tr>
+  <tr><td><code>sfopen xN,sS</code></td><td>Open file for write</td></tr>
+  <tr><td><code>swrite xN,sS</code></td><td>Write string to fd</td></tr>
+  <tr><td><code>sfclose xN</code></td><td>Close file fd</td></tr>
+  <tr><td><code>satoi xD,sS</code></td><td>String to integer</td></tr>
+  <tr><td><code>scpy sD,sS</code></td><td>Copy string</td></tr>
+  <tr><td><code>sappend sD,sS</code></td><td>Append string</td></tr>
+  <tr><td><code>sfmt sD,fmt,x1,s2,...</code></td><td>Format string</td></tr>
+</table>
+
+<div class="note">
+  <strong>No <code>jal</code>/<code>jr</code>/<code>jalr</code> or <code>mul</code> instructions.</strong>
+  Function calls don't exist — all code is inlined linearly. Multiplication uses shift-add or
+  repeated addition. The <code>ret</code> pseudo-instruction is encoded as <code>jalr x0, x1, 0</code>.
+</div>
+
+<h2>Pipeline Flow Walkthrough</h2>
+
+<div class="flow-step">1. <strong>Write C source</strong> in <code>c_source.c</code> — a subset C program with <code>int main()</code>, variable declarations, <code>putint()</code> calls, <code>while</code> loops, and <code>if/else</code> conditionals.</div>
+<div class="flow-step">2. <strong>Run cc.pal</strong> on the prisc+x VM: <code>./prisc_x cc.pal</code> — reads C source line-by-line, pattern-matches each line, emits RV32I assembly text to <code>/tmp/cc_out.s</code></div>
+<div class="flow-step">3. <strong>Run asm.pal</strong> on the prisc+x VM: <code>./prisc_x asm.pal</code> — reads the assembly text, performs two-pass assembly (Pass 1: label resolution, Pass 2: instruction encoding), outputs 32-bit binary values via <code>builtin_out</code></div>
+<div class="flow-step">4. <strong>Collect binary values</strong> — the 42 output integers are the RV32I machine code, ready for execution on any RV32I emulator</div>
+<h2>Running the Full Bootstrap Pipeline</h2>
+
+<pre><span class="cmt"># 1. Write C source</span>
+cat > c_source.c <span class="str">'EOF'
+int main() {
+    int x = 5;
+    int y = 3;
+    putint(x + y);
+    putint(x - y);
+    putint(x * y);
+    int i = 0;
+    while (i < 3) {
+        putint(i);
+        i = i + 1;
+    }
+    int z = 10;
+    if (z > 5) {
+        putint(1);
+    } else {
+        putint(0);
+    }
+    return 0;
+}
+EOF'</span>
+
+<span class="cmt"># 2. Build the VM</span>
+gcc -O2 -o prisc_x prisc+x.c
+
+<span class="cmt"># 3. Run the compiler (C → assembly text)</span>
+./prisc_x cc.pal
+<span class="cmt"># Output: /tmp/cc_out.s</span>
+
+<span class="cmt"># 4. Run the assembler (assembly text → RV32I binary)</span>
+./prisc_x asm.pal
+<span class="cmt"># Output: 42 encoded instruction values via builtin_out</span></pre>
+
+<h3>Test Files in <code>cc/test/</code></h3>
+<table>
+  <tr><th>File</th><th>Description</th><th>Key Instructions</th></tr>
+  <tr><td><code>hello.c</code></td><td><code>putint(42)</code></td><td>I-type, li, ecall</td></tr>
+  <tr><td><code>arithmetic.c</code></td><td><code>x+y</code>, <code>x-y</code>, <code>x*y</code></td><td>add, sub, mul</td></tr>
+  <tr><td><code>control.c</code></td><td><code>while (i<3)</code> loop</td><td>B-type, J-type</td></tr>
+  <tr><td><code>cond.c</code></td><td><code>if (x>5) else</code></td><td>slt, beq/bne</td></tr>
+  <tr><td><code>var_arith.c</code></td><td>Variables + arithmetic</td><td>LW/SW, stack</td></tr>
+  <tr><td><code>while.c</code></td><td>While loop pattern</td><td>Loop labels</td></tr>
+  <tr><td><code>all.c</code></td><td>Combined test</td><td>All features</td></tr>
+</table>
+
+<h3>Stack Layout (cc.pal)</h3>
+<p>The compiler emits stack frames with variables at fixed offsets from <code>sp</code>:</p>
+<pre><span class="lbl">main:</span>
+  addi sp, sp, -32        <span class="cmt"># Allocate 32 bytes</span>
+  sw   ra, 28(sp)         <span class="cmt"># Save return address</span>
+  <span class="cmt"># x = -4(sp), y = -8(sp), i = -12(sp)</span>
+  <span class="cmt"># z = -16(sp), a = -20(sp), b = -24(sp)</span>
+  <span class="cmt"># c = -28(sp), d = -32(sp)</span></pre>
+
+<h2>Key Design Decisions</h2>
+
+<h3>1. Pattern Matching Over AST</h3>
+<p>Instead of building an Abstract Syntax Tree, <code>cc.pal</code> uses direct pattern matching via <code>sfind</code>.
+This works because the C subset is very limited — each line matches exactly one known pattern.</p>
+
+<h3>2. Label Index Assumptions</h3>
+<p>The assembler uses hardcoded label indices (0=loop_start, 1=loop_body, etc.) rather than dynamic lookup.
+This avoids the need for a symbol table while trading flexibility for simplicity.</p>
+
+<h3>3. Two-Pass Label Resolution</h3>
+<p>Labels are resolved in Pass 1 and stored at <code>dmem[100+N]</code>. Pass 2 computes
+branch/jump offsets as <code>target_addr - current_addr</code>, enabling both forward and
+backward jumps.</p>
+
+<h3>4. Immediate Encoding in .pal</h3>
+<p>The <code>.pal</code> VM enforces a strict distinction:</p>
+<table>
+  <tr><th>Instruction</th><th>Operands</th><th>Example</th></tr>
+  <tr><td><code>addi rd, rs1, imm</code></td><td>2 registers + immediate</td><td><code>addi x5, x3, 100</code></td></tr>
+  <tr><td><code>add rd, rs1, rs2</code></td><td>3 registers only</td><td><code>add x10, x10, x11</code></td></tr>
+</table>
+<p>Passing an immediate to <code>add</code> silently fails — the third operand must be a register.</p>
+
+<h3>5. Output via <code>builtin_out</code></h3>
+<p>The assembler outputs each encoded instruction as a signed 32-bit integer via <code>builtin_out</code>.
+These values are the RV32I machine code bytes, ready for execution.</p>
+
+<h2>Byte Legend</h2>
+<div class="legend">
+  <span class="reg"></span> Register &nbsp;
+  <span class="imm"></span> Immediate &nbsp;
+  <span class="funct"></span> Funct3 &nbsp;
+  <span class="op"></span> Opcode &nbsp;
+  <span class="lbl"></span> Label
+</div>
+
+</body>
+</html>

@@ -1,0 +1,2 @@
+#!/bin/sh
+exec "${REALGCC:-/home/jb/Desktop/ele-desk+cal/1.RVEM/RVLV_EMUL/buildroot/output/host/bin/riscv64-buildroot-linux-gnu-gcc}" "$@" -specs "/home/jb/Desktop/ele-desk+cal/1.RVEM/musl-install/lib/musl-gcc.specs"

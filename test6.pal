@@ -1,0 +1,5 @@
+# Test with label and jump
+start:
+    builtin_out x0
+    j start
+halt
