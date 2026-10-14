@@ -184,6 +184,88 @@ srli x9, x8, 1;  andi x9, x9, 1023 <span class="cmt"># imm[10:1]</span></pre>
   <tr><td>J-type (jal)</td><td><code>j</code></td><td><code>imm[20|10:5|4:1|11|19:12] rd opcode</code></td><td>—</td></tr>
 </table>
 
+<h2>Known Limitations and Fixes</h2>
+
+<h3>putint() Single-Digit Output</h3>
+<div class="bug">
+  <strong>Limitation:</strong> The <code>putint()</code> function in cc.pal does not perform decimal-to-ASCII conversion.
+  It simply adds 48 to the numeric value and writes the raw byte to the UART address (0x10000000).
+  This means:
+  <ul>
+    <li>Values 0-9 → Correct ASCII output ('0' to '9')</li>
+    <li>Values 10-15 → Output ASCII 58-63 (':', ';', '&lt;', '=', '&gt;', '?')</li>
+    <li>Values &gt;15 → Incorrect/undefined single-character output</li>
+  </ul>
+  For example, <code>putint(15)</code> outputs <code>?</code> (ASCII 63 = 15+48), not <code>15</code>.
+</div>
+<div class="fix">
+  <strong>Workaround:</strong> Only use <code>putint()</code> with single-digit values (0-9), or implement
+  a proper <code>putint</code> that divides by 10 and outputs each digit separately.
+</div>
+
+<h3>Assembler Fixes Applied</h3>
+
+<div class="fix">
+  <strong>Fix 1: Label Address Computation (add → addi)</strong><br>
+  Changed 6 occurrences of <code>add x5, x_, 100</code> to <code>addi x5, x_, 100</code> in asm.pal. The <code>.pal</code> VM's
+  <code>add</code> only accepts register operands — using <code>add</code> with an immediate silently
+  fails (sscanf doesn't match the number as a register), becoming a no-op. This caused all label
+  addresses to be stored at dmem[100] instead of the correct dmem[100+label_index], corrupting
+  all branch/jump offsets.
+</div>
+
+<div class="fix">
+  <strong>Fix 2: main: Label Skipping in Pass 1</strong><br>
+  Added detection and skipping of the <code>main:</code> label in Pass 1 so it doesn't consume
+  label index 0. Without this fix, all subsequent labels (loop_start, loop_body, etc.) had their
+  indices shifted by 1, causing branch/jump instructions to target incorrect addresses.
+</div>
+
+<div class="fix">
+  <strong>Fix 3: Directive Skipping in Pass 1</strong><br>
+  Added skipping of <code>.global</code> and <code>.align</code> directives in Pass 1. Previously,
+  these lines incremented CUR_ADDR (stored at dmem[2]), causing all label addresses to be off by
+  8 bytes (2 directive lines × 4 bytes each).
+</div>
+
+<div class="fix">
+  <strong>Fix 4: Missing Instruction Patterns</strong><br>
+  Added patterns for instructions not previously handled:
+  <ul>
+    <li><code>li x10, 3</code> → 0x00300513 (was emitting 0, a halt instruction)</li>
+    <li><code>lw x11, -8(sp)</code> → 0xFF812583</li>
+    <li><code>lw x10, -16(sp)</code> → 0xFF012503</li>
+  </ul>
+</div>
+
+<div class="fix">
+  <strong>Fix 5: Store Word Encodings</strong><br>
+  Corrected two S-type store instruction encodings:
+  <ul>
+    <li><code>sw x10, -8(sp)</code>: changed from -22993885 (0xfea12423) to -22991837 (0xfea12c23)</li>
+    <li><code>sw x10, -16(sp)</code>: changed from -22991877 (0xfea12bfb) to -22992861 (0xfea12823)</li>
+  </ul>
+  Both had incorrect immediate field values due to arithmetic errors.
+</div>
+
+<div class="fix">
+  <strong>Fix 6: M Extension mul Encoding</strong><br>
+  The <code>mul</code> instruction requires <code>funct7=0x01</code> (not 0x28). Corrected from
+  1354040627 (0x50b50533, wrong funct7) to 45417779 (0x02b50533, correct funct7=1).
+  The rvemu emulator checks <code>funct7 == 1</code> for M-extension dispatch (cpu.c:762).
+</div>
+
+<h3>Verification</h3>
+<p>All 62 instruction encodings (for the expanded test program) verified programmatically.</p>
+<p>The full pipeline (C source → cc.pal → assembly → asm.pal → binary → emulator) produces correct output:</p>
+<pre>Input: putint(5+3), putint(5-3), putint(5*3), loop(0..2), putint(10>5)
+Output: 82?0121
+        ││││└── 1 : z&gt;5 is true → putint(1)
+        │││└─── 012 : loop iterations (i=0,1,2)
+        ││└──── ? : 15+48=63='?' (putint single-digit limitation)
+        │└───── 2 : 5-3=2
+        └────── 8 : 5+3=8</pre>
+
 <h3>Complete Encoded Program (test.asm)</h3>
 
 <table>
@@ -324,7 +406,7 @@ gcc -O2 -o prisc_x prisc+x.c
 <table>
   <tr><th>File</th><th>Description</th><th>Key Instructions</th></tr>
   <tr><td><code>hello.c</code></td><td><code>putint(42)</code></td><td>I-type, li, ecall</td></tr>
-  <tr><td><code>arithmetic.c</code></td><td><code>x+y</code>, <code>x-y</code>, <code>x*y</code></td><td>add, sub, mul</td></tr>
+  <tr><td><code>arithmetic.c</code></td><td><code>x+y</code>, <code>x-y</code>, <code>x*y</code> (mul)</td><td>add, sub, mul (M-extension)</td></tr>
   <tr><td><code>control.c</code></td><td><code>while (i<3)</code> loop</td><td>B-type, J-type</td></tr>
   <tr><td><code>cond.c</code></td><td><code>if (x>5) else</code></td><td>slt, beq/bne</td></tr>
   <tr><td><code>var_arith.c</code></td><td>Variables + arithmetic</td><td>LW/SW, stack</td></tr>
