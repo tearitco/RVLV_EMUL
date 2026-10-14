@@ -30,6 +30,7 @@ fi
 echo "Building bitstreams..."
 "$PNR" "$HDL0_DIR/counter4.hdl0" /tmp/counter4.bit
 "$PNR" "$HDL0_DIR/gpio_echo.hdl0" /tmp/gpio_echo.bit
+"$PNR" "$HDL0_DIR/gpio_reg.hdl0" /tmp/gpio_reg.bit
 echo ""
 
 # Build tests

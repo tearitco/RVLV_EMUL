@@ -70,8 +70,6 @@
 .LUT result0 [bitwise0.out, arith0.out, fn2] = {0,1,0,1,0,0,1,1}
 
 # Bits 1-7: selects bitwise (fn2=0), sum (fn2=1,fn1=0), or 0 (SLT: fn2=1,fn1=1)
-# tt indexed by [bitwise, sum, fn2, fn1]:
-#   00xx: bitwise, 01xx: bitwise, 1000: bitwise, 1001: sum, 1010: sum, 1011: sum, 11xx: 0 (SLT)
 .LUT result1 [bitwise1.out, sum_1.out, fn2, fn1] = {0,1,0,1,0,0,1,1,0,1,0,1,0,0,0,0}
 .LUT result2 [bitwise2.out, sum_2.out, fn2, fn1] = {0,1,0,1,0,0,1,1,0,1,0,1,0,0,0,0}
 .LUT result3 [bitwise3.out, sum_3.out, fn2, fn1] = {0,1,0,1,0,0,1,1,0,1,0,1,0,0,0,0}

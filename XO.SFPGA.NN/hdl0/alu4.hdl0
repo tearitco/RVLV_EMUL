@@ -1,0 +1,47 @@
+# 4-bit ALU peripheral for FPGA MMIO testing
+# 4-bit inputs a[3:0], b[3:0] and function selector fn[2:0]
+# Pins 0-3: a (operand A)
+# Pins 4-7: b (operand B)  
+# Pin 8: fn0, Pin 9: fn1, Pin 10: fn2
+# Pins 11-14: result, Pin 15: carry
+
+.LUT b_mod0 [pin0_in, pin8, pin9, pin10] = {0,1,0,1,0,1,0,1,0,1,1,0,1,0,1,0}
+.LUT b_mod1 [pin1_in, pin8, pin9, pin10] = {0,1,0,1,0,1,0,1,0,1,1,0,1,0,1,0}
+.LUT b_mod2 [pin2_in, pin8, pin9, pin10] = {0,1,0,1,0,1,0,1,0,1,1,0,1,0,1,0}
+.LUT b_mod3 [pin3_in, pin8, pin9, pin10] = {0,1,0,1,0,1,0,1,0,1,1,0,1,0,1,0}
+.LUT carry_in [pin8, pin9, pin10] = {0,0,0,0,0,1,1,1}
+.LUT carry_0 [pin0_in, b_mod0.out, carry_in.out] = {0,0,0,1,0,1,1,1}
+.LUT carry_1 [pin1_in, b_mod1.out, carry_0.out] = {0,0,0,1,0,1,1,1}
+.LUT carry_2 [pin2_in, b_mod2.out, carry_1.out] = {0,0,0,1,0,1,1,1}
+.LUT carry_3 [pin3_in, b_mod3.out, carry_2.out] = {0,0,0,1,0,1,1,1}
+.LUT sum_0 [pin0_in, b_mod0.out, carry_in.out] = {0,1,1,0,1,0,0,1}
+.LUT sum_1 [pin1_in, b_mod1.out, carry_0.out] = {0,1,1,0,1,0,0,1}
+.LUT sum_2 [pin2_in, b_mod2.out, carry_1.out] = {0,1,1,0,1,0,0,1}
+.LUT sum_3 [pin3_in, b_mod3.out, carry_2.out] = {0,1,1,0,1,0,0,1}
+.LUT bitwise0 [pin0_in, pin4, pin8, pin9] = {0,0,0,1,0,1,1,1,0,1,1,0,1,0,1,0}
+.LUT bitwise1 [pin1_in, pin5, pin8, pin9] = {0,0,0,1,0,1,1,1,0,1,1,0,1,0,1,0}
+.LUT bitwise2 [pin2_in, pin6, pin8, pin9] = {0,0,0,1,0,1,1,1,0,1,1,0,1,0,1,0}
+.LUT bitwise3 [pin3_in, pin7, pin8, pin9] = {0,0,0,1,0,1,1,1,0,1,1,0,1,0,1,0}
+.LUT slt_detect [pin3_in, pin7, sum_3.out] = {0,1,0,0,1,1,0,1}
+.LUT arith0 [sum_0.out, slt_detect.out, pin9] = {0,1,0,1,0,0,1,1}
+.LUT result0 [bitwise0.out, arith0.out, pin10] = {0,1,0,1,0,0,1,1}
+.LUT result1 [bitwise1.out, sum_1.out, pin10, pin9] = {0,1,0,1,0,0,1,1,0,1,0,1,0,0,0,0}
+.LUT result2 [bitwise2.out, sum_2.out, pin10, pin9] = {0,1,0,1,0,0,1,1,0,1,0,1,0,0,0,0}
+.LUT result3 [bitwise3.out, sum_3.out, pin10, pin9] = {0,1,0,1,0,0,1,1,0,1,0,1,0,0,0,0}
+.PIN pin0_in = pin0_in
+.PIN pin1_in = pin1_in
+.PIN pin2_in = pin2_in
+.PIN pin3_in = pin3_in
+.PIN pin4 = pin4
+.PIN pin5 = pin5
+.PIN pin6 = pin6
+.PIN pin7 = pin7
+.PIN pin8 = pin8
+.PIN pin9 = pin9
+.PIN pin10 = pin10
+.PIN alu_result0 = result0.out
+.PIN alu_result1 = result1.out
+.PIN alu_result2 = result2.out
+.PIN alu_result3 = result3.out
+.PIN alu_carry = carry_3.out
+.END

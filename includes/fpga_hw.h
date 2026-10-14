@@ -105,6 +105,7 @@ typedef struct {
     uint8_t       clk_div;
     uint8_t       clk_counter;
     uint8_t       clk;
+    uint8_t       prev_clk;
 } fpga_t;
 
 #define FPGA_BITSTREAM_MAGIC 0x584F5346

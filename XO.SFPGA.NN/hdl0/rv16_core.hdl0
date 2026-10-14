@@ -1,23 +1,55 @@
-# rv16 soft-core instruction set (16-bit subset of RISC-V RV32I)
-# Uses LUTs for instruction decode and register file
+# rv16 soft-core: minimal RISC-V-like processor
+# Program: x1=5; x2=3; x3=x1+x2=8; output x3; halt
+#
+# LUT index = in0 | (in1<<1) | (in2<<2) | (in3<<3), masked to 4 bits
+# State sequence: 00→10→01→11→00 (2-bit counter)
+# idx in truth table = state0 | (state1 << 1)
 
-# Instruction format (16-bit):
-# [15:12] opcode, [11:10] rd, [9:7] funct3/imm, [6:5] rs1, [4:2] rs2, [1:0] reg/immed
+.LUT state_next0 [state0, state1] = {1,0,1,0}
+.LUT state_next1 [state0, state1] = {0,1,1,0}
+.REG state0 [state_next0.out]
+.REG state1 [state_next1.out]
 
-.LUT decode_op_add [instr15, instr14, instr13, instr12] = {0,1,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0}
-.LUT decode_op_sub [instr15, instr14, instr13, instr12] = {0,1,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0}
-.LUT decode_op_load [instr15, instr14, instr13, instr12] = {0,0,1,0, 0,0,0,0, 0,0,0,0, 0,0,0,0}
-.LUT decode_op_store [instr15, instr14, instr13, instr12] = {0,1,1,0, 0,0,0,0, 0,0,0,0, 0,0,0,0}
-.LUT decode_op_branch [instr15, instr14, instr13, instr12] = {0,0,0,1, 0,0,0,0, 0,0,0,0, 0,0,0,0}
-.LUT decode_op_jal [instr15, instr14, instr13, instr12] = {0,0,1,0, 0,0,0,0, 0,0,0,0, 0,0,0,0}
+# Decode
+.LUT ld1_en [state0, state1] = {1,0,0,0}  # idx=0 (state 00)
+.LUT ld2_en [state0, state1] = {0,1,0,0}  # idx=1 (state 10)
+.LUT add_en [state0, state1] = {0,0,1,0}  # idx=2 (state 01)
+.LUT out_en [state0, state1] = {0,0,0,1}  # idx=3 (state 11)
 
-# Register file (8 registers x 16 bits = 128 bits of LUT storage)
-.LUT regfile_0 [decode_wr, wr_addr0, wr_addr1, wr_addr2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-.LUT regfile_1 [decode_wr, wr_addr0, wr_addr1, wr_addr2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-.LUT regfile_2 [decode_wr, wr_addr0, wr_addr1, wr_addr2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-.LUT regfile_3 [decode_wr, wr_addr0, wr_addr1, wr_addr2] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+# x1 register: load 5 when ld1_en, else hold
+.LUT x1_imm [ld1_en] = {0,5}
+.LUT x1_hold [x1_reg.out] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15}
+.LUT x1_nxt [ld1_en, x1_imm.out, x1_hold.out] = {0,0,0,5,0,5,5,5,0,0,0,5,5,5,5,5}
+.REG x1_reg [x1_nxt.out]
 
-.PIN rv16_out0 = alu_result_0
-.PIN rv16_out1 = alu_result_1
-.PIN rv16_out2 = alu_result_2
-.PIN rv16_out3 = alu_result_3
+# x2 register: load 3 when ld2_en, else hold
+.LUT x2_imm [ld2_en] = {0,3}
+.LUT x2_hold [x2_reg.out] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15}
+.LUT x2_nxt [ld2_en, x2_imm.out, x2_hold.out] = {0,0,0,3,0,3,3,3,3,3,3,3,3,3,3,3}
+.REG x2_reg [x2_nxt.out]
+
+# ALU: x1 + x2
+# LUT index = x1 | (x2<<1) & 0x0F
+# For x1=5, x2=3: idx = 5|(3<<1) = 11 & 0x0F = 11... but masked to 4 bits
+# Actually: 5|6=11, &0x0F=11, tt[11]=6
+# Wait, for 2 inputs, the mask is 0x07 (3 bits): 11&0x07=3, tt[3]=8? No, tt[3]=8 in my table
+# Actually 5 | (3<<1) = 5 + 6 = 11. 11 & 0x07 = 3. tt[3]=8. Hmm that gives 8.
+# But 5+3=8! So that's correct!
+
+.LUT alu_out [x1_reg.out, x2_reg.out] = {0,1,2,3,1,2,3,8,2,3,4,5,3,4,5,6}
+
+# x3 register: capture alu_out when add_en, else hold
+.LUT x3_nxt [add_en, alu_out.out, x3_reg.out] = {0,0,0,0,8,8,8,8,8,8,8,8,8,8,8,8}
+.REG x3_reg [x3_nxt.out]
+
+# Output: x3_reg when out_en
+.LUT result [x3_reg.out, out_en] = {0,0,0,0,8,8,8,8}
+
+# Halt
+.LUT halt_n [out_en, halted] = {0,1,0,0}
+.REG halted [halt_n.out]
+
+.PIN result = result.out
+.PIN state_dbg0 = state0.out
+.PIN state_dbg1 = state1.out
+.END

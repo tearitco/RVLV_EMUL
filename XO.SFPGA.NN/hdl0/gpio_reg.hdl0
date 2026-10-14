@@ -1,0 +1,18 @@
+# Register-based GPIO peripheral for FPGA <-> rvemu
+# 8-pin GPIO: pins 0-3 inputs, pins 4-7 outputs
+# 4-input LUTs with identity truth table echo inputs to outputs
+
+.LUT buf0 [pin0_in, 0, 0, 0] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15}
+.LUT buf1 [pin1_in, 0, 0, 0] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15}
+.LUT buf2 [pin2_in, 0, 0, 0] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15}
+.LUT buf3 [pin3_in, 0, 0, 0] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15}
+
+.PIN pin0_in = pin0_in
+.PIN pin1_in = pin1_in
+.PIN pin2_in = pin2_in
+.PIN pin3_in = pin3_in
+.PIN out0 = buf0.out
+.PIN out1 = buf1.out
+.PIN out2 = buf2.out
+.PIN out3 = buf3.out
+.END
