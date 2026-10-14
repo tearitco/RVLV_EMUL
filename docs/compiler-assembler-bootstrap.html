@@ -184,6 +184,23 @@ srli x9, x8, 1;  andi x9, x9, 1023 <span class="cmt"># imm[10:1]</span></pre>
   <tr><td>J-type (jal)</td><td><code>j</code></td><td><code>imm[20|10:5|4:1|11|19:12] rd opcode</code></td><td>—</td></tr>
 </table>
 
+<h2>Bootstrap Status</h2>
+
+<div class="box">
+  <strong>Current: WORKING (not self-hosting)</strong><br>
+  The pipeline C → cc.pal → assembler → RV32I binary → rvemu is fully functional.
+  All 62 instruction encodings are verified. Output: <code>82?0121</code> ✓
+  <br><br>
+  <strong>Next Milestone: Self-Hosting</strong><br>
+  To achieve self-hosting, requires:
+  <ol>
+    <li><strong>Multi-digit putint</strong>: Implement decimal output (divide by 10 loop) in the generated assembly</li>
+    <li><strong>Extended C subset</strong>: Support arrays, pointers, and more complex expressions in cc.pal</li>
+    <li><strong>C port of compiler</strong>: Write a C version of cc.pal that cc.pal can compile</li>
+    <li><strong>Compile and run</strong>: Use the current cc.pal → cc.bin → run on rvemu → compile more C</li>
+  </ol>
+</div>
+
 <h2>Known Limitations and Fixes</h2>
 
 <h3>putint() Single-Digit Output</h3>
