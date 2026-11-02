@@ -50,7 +50,7 @@ static uint32_t enc_s(uint32_t op, uint32_t f3, uint32_t rs1, uint32_t rs2, int3
 
 static int setup(CPU *cpu)
 {
-    if (cpu_init(cpu, 4 * 1024 * 1024, nullptr, 0) < 0)
+    if (cpu_init(cpu, 4 * 1024 * 1024, NULL, 0) < 0)
         return -1;
     cpu->csr[MIE] = 0;
     return 0;

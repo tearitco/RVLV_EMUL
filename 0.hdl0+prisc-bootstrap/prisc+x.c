@@ -222,7 +222,7 @@ void handle_sigint(int sig) {
 typedef enum { OP_ADDI, OP_ADD, OP_SUB, OP_ANDI, OP_ORI, OP_XORI, OP_SLLI, OP_SRLI, OP_SLL, OP_SLT, OP_SLTU, OP_XOR, OP_OR, OP_SRL, OP_SRA, OP_BEQ, OP_BNE, OP_LW, OP_SW, OP_JALR, OP_J, OP_HALT, OP_CUSTOM, OP_READ_HISTORY, OP_EXEC, OP_HIT_FRAME, OP_READ_STATE, OP_READ_ACTIVE_TARGET, OP_READ_ENV_KEY, OP_SLEEP, OP_READ_LAYOUT, OP_READ_POS, OP_ECALL,
     OP_SLIT, OP_SCPY, OP_SAPPEND, OP_SGETENV, OP_SFMT, OP_SREAD, OP_SSPLIT,
     OP_SFIND, OP_SLEN, OP_SFOPEN, OP_SFAPPEND, OP_SWRITE, OP_SFCLOSE,
-    OP_SBEQ, OP_SBNE, OP_STRIM, OP_SATOI } OpBase;
+    OP_SBEQ, OP_SBNE, OP_STRIM, OP_SATOI, OP_SWBIN } OpBase;
 
 typedef struct {
     OpBase op;
@@ -868,6 +868,10 @@ void parse_line(char *line, int pass) {
         } else if (strcmp(part, "sfclose") == 0) {
             sscanf(line, "%*s x%d", &i->rs1);
             i->op = OP_SFCLOSE;
+        } else if (strcmp(part, "swbin") == 0) {
+            /* SWBIN xFD, xADDR, xLEN - write raw bytes from memory to file */
+            sscanf(line, "%*s x%d, x%d, x%d", &i->rs1, &i->rs2, &i->rs3);
+            i->op = OP_SWBIN;
         } else if (strcmp(part, "sbeq") == 0) {
             sscanf(line, "%*s s%d, s%d, %31s", &i->ss1, &i->ss2, i->label_ref);
             i->op = OP_SBEQ;
@@ -1540,6 +1544,31 @@ int main(int argc, char **argv) {
             int fd = regs[i.rs1];
             if (fd >= 0 && fd < MAX_ECALL_FDS && ecall_fds[fd]) {
                 fclose(ecall_fds[fd]); ecall_fds[fd] = NULL;
+            }
+        } else if (i.op == OP_SWBIN) {
+            int fd = regs[i.rs1];
+            uint64_t addr = regs[i.rs2];
+            uint64_t len = regs[i.rs3];
+            if (fd >= 0 && fd < MAX_ECALL_FDS && ecall_fds[fd] && addr < MEM_SIZE) {
+                if (addr + len > MEM_SIZE) len = MEM_SIZE - addr;
+                if (len > 0) {
+                    FILE *f = ecall_fds[fd];
+                    uint8_t buf[64];
+                    uint64_t total = 0;
+                    while (total < len) {
+                        uint64_t chunk = len - total;
+                        if (chunk > sizeof(buf)) chunk = sizeof(buf);
+                        uint64_t ba = addr + total;
+                        uint64_t cell = ba / 4;
+                        uint64_t bo = ba % 4;
+                        for (uint64_t j = 0; j < chunk && bo + j < 4; j++) {
+                            buf[total + j] = ((uint8_t *)&mem[cell])[bo + j];
+                        }
+                        fwrite(buf, 1, chunk, f);
+                        total += chunk;
+                    }
+                    fflush(f);
+                }
             }
         } else if (i.op == OP_SBEQ || i.op == OP_SBNE) {
             int target = -1;

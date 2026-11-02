@@ -1,0 +1,20 @@
+# 74HC4066: Quad Bilateral Switch
+# Inputs: en (enable), in0-in3 (data inputs)
+# Outputs: out0-out3
+# When en=1: outn = inn (switch closed); When en=0: outn = 0 (switch open)
+# Each channel: LUT4 with inputs [en, in] -> Y = en ? in : 0
+.FABRIC 4 4
+.LUT sw0 [en_in, in0_in] = {0,0,0,1}
+.LUT sw1 [en_in, in1_in] = {0,0,0,1}
+.LUT sw2 [en_in, in2_in] = {0,0,0,1}
+.LUT sw3 [en_in, in3_in] = {0,0,0,1}
+.PIN en_in = en_in
+.PIN in0_in = in0_in
+.PIN in1_in = in1_in
+.PIN in2_in = in2_in
+.PIN in3_in = in3_in
+.PIN out0 = sw0.out
+.PIN out1 = sw1.out
+.PIN out2 = sw2.out
+.PIN out3 = sw3.out
+.END

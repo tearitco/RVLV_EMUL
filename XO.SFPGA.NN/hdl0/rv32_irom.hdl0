@@ -1,0 +1,18 @@
+# rv32_irom: 4-word instruction ROM using register init values
+# Stores a program in register init values (1 instruction per reg)
+.FABRIC 4 4
+.LUT pc_inv [pc.q] = {0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1}
+.LUT pc_hi [pc.q] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT sel_inst0 [pc.q] = {1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0}
+.LUT sel_inst1 [pc.q] = {0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0}
+.LUT sel_inst2 [pc.q] = {0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0}
+.LUT sel_inst3 [pc.q] = {0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0}
+.LUT inst0_out [sel_inst0.out] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT inst1_out [sel_inst1.out] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT inst2_out [sel_inst2.out] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT inst3_out [sel_inst3.out] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+.LUT inst_combined [sel_inst0.out, sel_inst1.out, sel_inst2.out, sel_inst3.out] = {0,0,0,0,1,0,0,0,2,0,0,0,3,0,0,0}
+.REG pc [pc_inv.out] clk_en=1 init=0,0,0,0
+.PIN inst_pin 1 inst_combined.out
+.PIN pc_pin 1 pc.q
+.END

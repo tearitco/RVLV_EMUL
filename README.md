@@ -144,6 +144,8 @@ also stop the emulator.
   for root causes fixed (kernel image header magic offset, SBI PMU extension,
   FPU `FS=Off` SIGILL, non-M `ecall` interception, UART DT node).
 - **Built-in `--selftest` and bare-metal tests:** passing.
+- **RV64I assembler in `.pal` (`asm.pal`):** Encodes RISC-V machine code and
+  wraps it in an ELF64 PT_LOAD binary. See [docs/ASSEMBLER.md](docs/ASSEMBLER.md).
 
 ## XO.SFPGA.NN — Discrete 7400-Series FPGA Emulator
 

@@ -1,11 +1,161 @@
-# asm.pal - RISC-V RV32I Instruction Encoder
-# Encodes RISC-V machine code using prisc+x R-type arithmetic
-# Verifies encoding of all major RISC-V instruction formats.
+# asm.pal - RISC-V RV64I Assembler with ELF64 PT_LOAD output
+# Encodes RISC-V machine code and wraps it in an ELF64 binary
+# Output: output.elf - ELF64 executable loadable by rvemu
+# All values in decimal (sscanf %d does not parse 0x hex)
 
-# === R-type: add x1, x2, x3 ===
-# funct7=0, rs2=3, rs1=2, funct3=0, rd=1, opcode=0x33
-# = 0 | 3<<20 | 2<<15 | 0 | 1<<7 | 0x33 = 0x003100B3 = 3211443
+# === Phase 0: Open output file ===
+# SYS_OPEN: x15=1, x13=mode(1=write), literal_arg="output.elf" -> x12=fd
+li x15, 1
+li x13, 1
+ecall "output.elf"
+addi x12, x12, 0
 
+# === Phase 1: Build ELF64 header in mem[0..15] (64 bytes) ===
+addi x8, x0, 0
+
+# mem[0] = 0x464C457F = 1179403647 (ELF magic)
+li x1, 1179403647
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[1] = 0x00010102 = 65794 (class=64bit, data=LE, version=1)
+li x1, 65794
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[2] = 0 (padding)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[3] = 0 (padding)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[4] = 0x00F30002 = 15925250 (e_type=2, e_machine=0xF3)
+li x1, 15925250
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[5] = 1 (e_version)
+li x1, 1
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[6] = -2147483648 (e_entry = 0x80000000)
+li x1, -2147483648
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[7] = 0 (e_entry high)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[8] = 64 (e_phoff)
+li x1, 64
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[9] = 0 (e_phoff high)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[10] = 0 (e_shoff)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[11] = 0 (e_shoff high)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[12] = 0 (e_flags)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[13] = 0x00380040 = 3670080 (e_ehsize=64, e_phentsize=56)
+li x1, 3670080
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[14] = 0x00400001 = 4194305 (e_phnum=1, e_shentsize=64)
+li x1, 4194305
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[15] = 0 (e_shnum=0, e_shstrndx=0)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# === Phase 2: Build program header in mem[16..29] (56 bytes) ===
+
+# mem[16] = 1 (p_type = PT_LOAD)
+li x1, 1
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[17] = 5 (p_flags = PF_R | PF_X)
+li x1, 5
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[18] = 120 (p_offset = 120)
+li x1, 120
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[19] = -2147483648 (p_vaddr low = 0x80000000)
+li x1, -2147483648
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[20] = 0 (p_vaddr high)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[21] = -2147483648 (p_paddr low)
+li x1, -2147483648
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[22] = 0 (p_paddr high)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[23] = 28 (p_filesz = 28 bytes = 7 instructions)
+li x1, 28
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[24] = 0 (p_filesz high)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[25] = 28 (p_memsz = 28)
+li x1, 28
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[26] = 0 (p_memsz high)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[27] = 4096 (p_align = 4096)
+li x1, 4096
+sw x1, 0(x8)
+addi x8, x8, 1
+
+# mem[28] = 0 (p_align high)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# mem[29] = 0 (scratch)
+sw x0, 0(x8)
+addi x8, x8, 1
+
+# x8 = 30 now - instruction buffer starts here
+
+# === Phase 3: Encode RISC-V instructions into mem[30..] ===
+
+# === R-type: add x1, x2, x3 === 0x003100B3 = 3211443
 li x1, 3
 slli x1, x1, 20
 li x2, 2
@@ -13,12 +163,10 @@ slli x2, x2, 15
 add x3, x1, x2
 addi x3, x3, 128
 addi x3, x3, 51
-builtin_out x3
+sw x3, 0(x8)
+addi x8, x8, 1
 
-# === R-type: sub x4, x5, x6 ===
-# funct7=0x20=32, rs2=6, rs1=5, funct3=0, rd=4, opcode=0x33
-# = 32<<25 | 6<<20 | 5<<15 | 0 | 4<<7 | 0x33 = 0x40628233 = 1080197683
-
+# === R-type: sub x4, x5, x6 === 0x40628233 = 1080197683
 li x1, 32
 slli x1, x1, 25
 li x2, 6
@@ -31,12 +179,10 @@ li x4, 4
 slli x4, x4, 7
 add x3, x3, x4
 addi x3, x3, 51
-builtin_out x3
+sw x3, 0(x8)
+addi x8, x8, 1
 
-# === I-type: addi x7, x8, 42 ===
-# imm=42, rs1=8, funct3=0, rd=7, opcode=0x13
-# = 42<<20 | 8<<15 | 0 | 7<<7 | 0x13 = 0x02A40393 = 44303251
-
+# === I-type: addi x7, x8, 42 === 0x02A40393 = 44303251
 li x1, 42
 slli x1, x1, 20
 li x2, 8
@@ -46,12 +192,10 @@ li x4, 7
 slli x4, x4, 7
 add x3, x3, x4
 addi x3, x3, 19
-builtin_out x3
+sw x3, 0(x8)
+addi x8, x8, 1
 
-# === I-type: andi x9, x10, 15 ===
-# imm=15, rs1=10, funct3=7, rd=9, opcode=0x13
-# = 15<<20 | 10<<15 | 7<<12 | 9<<7 | 0x13 = 0x00F57493 = 16086163
-
+# === I-type: andi x9, x10, 15 === 0x00F57493 = 16086163
 li x1, 15
 slli x1, x1, 20
 li x2, 10
@@ -62,12 +206,10 @@ li x4, 9
 slli x4, x4, 7
 add x3, x3, x4
 addi x3, x3, 19
-builtin_out x3
+sw x3, 0(x8)
+addi x8, x8, 1
 
-# === S-type: sw x11, 4(x12) ===
-# imm=4, rs1=12, rs2=11, funct3=2, opcode=0x27
-# = 0<<25 | 11<<20 | 12<<15 | 2<<12 | 4<<7 | 0x27 = 0x00B08227 = 11567655
-
+# === S-type: sw x11, 4(x12) === 0x00B08227 = 11567655
 li x1, 11
 slli x1, x1, 20
 li x2, 12
@@ -76,12 +218,10 @@ add x3, x1, x2
 addi x3, x3, 8192
 addi x3, x3, 512
 addi x3, x3, 39
-builtin_out x3
+sw x3, 0(x8)
+addi x8, x8, 1
 
-# === B-type: beq x13, x14, 8 ===
-# imm=8, rs1=13, rs2=14, funct3=0, opcode=0x63
-# = 0 | 14<<20 | 13<<15 | 0 | 2<<8 | 0x63 = 0x00E06A63 = 15106659
-
+# === B-type: beq x13, x14, 8 === 0x00E06A63 = 15106659
 li x1, 14
 slli x1, x1, 20
 li x2, 13
@@ -89,18 +229,72 @@ slli x2, x2, 15
 add x3, x1, x2
 addi x3, x3, 512
 addi x3, x3, 99
-builtin_out x3
+sw x3, 0(x8)
+addi x8, x8, 1
 
-# === U-type: lui x15, 0x12345 ===
-# opcode=0x37, rd=15, imm=0x12345=74565
-# = 74565<<12 | 15<<7 | 0x37 = 0x123457B7 = 305420215
-
+# === U-type: lui x15, 0x12345 === 0x123457B7 = 305420215
 li x1, 74565
 slli x1, x1, 12
 li x2, 15
 slli x2, x2, 7
 add x3, x1, x2
 addi x3, x3, 55
-builtin_out x3
+sw x3, 0(x8)
+addi x8, x8, 1
 
+# === RV64I: ld x1, 0(x2) === 0x00013083 = 77955
+li x1, 2
+slli x1, x1, 15
+add x3, x0, x1
+addi x3, x3, 12288
+li x4, 1
+slli x4, x4, 7
+add x3, x3, x4
+addi x3, x3, 3
+sw x3, 0(x8)
+addi x8, x8, 1
+
+# === RV64I: sd x1, 0(x2) === 0x00110827 = 1126439
+li x1, 1
+slli x1, x1, 20
+li x2, 2
+slli x2, x2, 15
+add x3, x1, x2
+addi x3, x3, 12288
+li x4, 1
+slli x4, x4, 7
+add x3, x3, x4
+addi x3, x3, 39
+sw x3, 0(x8)
+addi x8, x8, 1
+
+# === RV64I: addiw x1, x2, 100 === 0x0648002B = 104923291
+li x1, 100
+slli x1, x1, 20
+li x2, 2
+slli x2, x2, 15
+add x3, x1, x2
+li x4, 1
+slli x4, x4, 7
+add x3, x3, x4
+addi x3, x3, 27
+sw x3, 0(x8)
+addi x8, x8, 1
+
+# x8 = 37 now - 37 words total (mem[0..36])
+
+# === Phase 4: Write ELF64 binary to file ===
+# SYS_WRITE_MEM: x15=8, x12=fd, x13=addr, x14=count
+# Count = 37 words * 4 bytes = 148 bytes
+li x15, 8
+li x13, 0
+li x14, 148
+ecall
+
+# === Phase 5: Close file and exit ===
+li x15, 2
+ecall
+li x15, 9
+li x10, 0
+ecall
 halt

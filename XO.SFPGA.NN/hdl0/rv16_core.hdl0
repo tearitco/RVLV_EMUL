@@ -1,55 +1,37 @@
-# rv16 soft-core: minimal RISC-V-like processor
-# Program: x1=5; x2=3; x3=x1+x2=8; output x3; halt
+# rv16_core.hdl0 - minimal state machine processor
+# State sequence: 00→10→01→11→00
+# 00: load x1=3; 10: load x2=5; 01: x3=8; 11: output x3=8 on pin0
 #
-# LUT index = in0 | (in1<<1) | (in2<<2) | (in3<<3), masked to 4 bits
-# State sequence: 00→10→01→11→00 (2-bit counter)
-# idx in truth table = state0 | (state1 << 1)
+# LUT index = LSB(in0) | (LSB(in1)<<1) | (LSB(in2)<<1) ...
+# LUT output is a full byte from truth table entry.
 
-.LUT state_next0 [state0, state1] = {1,0,1,0}
-.LUT state_next1 [state0, state1] = {0,1,1,0}
-.REG state0 [state_next0.out]
-.REG state1 [state_next1.out]
+# 2-bit state register: state0=LSB, state1=MSB
+# 00→10→01→11→00
+.LUT state_nxt0 [state0.q, state1.q] = {0,1,1,0}
+.LUT state_nxt1 [state0.q, state1.q] = {1,1,0,0}
+.REG state0 [state_nxt0.out]
+.REG state1 [state_nxt1.out]
 
-# Decode
-.LUT ld1_en [state0, state1] = {1,0,0,0}  # idx=0 (state 00)
-.LUT ld2_en [state0, state1] = {0,1,0,0}  # idx=1 (state 10)
-.LUT add_en [state0, state1] = {0,0,1,0}  # idx=2 (state 01)
-.LUT out_en [state0, state1] = {0,0,0,1}  # idx=3 (state 11)
+# State decode (active-high for each state)
+.LUT ld1_en [state0.q, state1.q] = {1,0,0,0}  # 00
+.LUT ld2_en [state0.q, state1.q] = {0,0,1,0}  # 10
+.LUT add_en [state0.q, state1.q] = {0,1,0,0}  # 01
+.LUT out_en [state0.q, state1.q] = {0,0,0,1}  # 11
 
-# x1 register: load 5 when ld1_en, else hold
-.LUT x1_imm [ld1_en] = {0,5}
-.LUT x1_hold [x1_reg.out] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15}
-.LUT x1_nxt [ld1_en, x1_imm.out, x1_hold.out] = {0,0,0,5,0,5,5,5,0,0,0,5,5,5,5,5}
+# x1 register: load 3 when ld1_en, else holds via x1_reg passthrough
+.LUT x1_nxt [ld1_en.out] = {0,3}
 .REG x1_reg [x1_nxt.out]
 
-# x2 register: load 3 when ld2_en, else hold
-.LUT x2_imm [ld2_en] = {0,3}
-.LUT x2_hold [x2_reg.out] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15}
-.LUT x2_nxt [ld2_en, x2_imm.out, x2_hold.out] = {0,0,0,3,0,3,3,3,3,3,3,3,3,3,3,3}
+# x2 register: load 5 when ld2_en, else 0 (not needed after)
+.LUT x2_nxt [ld2_en.out] = {0,5}
 .REG x2_reg [x2_nxt.out]
 
-# ALU: x1 + x2
-# LUT index = x1 | (x2<<1) & 0x0F
-# For x1=5, x2=3: idx = 5|(3<<1) = 11 & 0x0F = 11... but masked to 4 bits
-# Actually: 5|6=11, &0x0F=11, tt[11]=6
-# Wait, for 2 inputs, the mask is 0x07 (3 bits): 11&0x07=3, tt[3]=8? No, tt[3]=8 in my table
-# Actually 5 | (3<<1) = 5 + 6 = 11. 11 & 0x07 = 3. tt[3]=8. Hmm that gives 8.
-# But 5+3=8! So that's correct!
-
-.LUT alu_out [x1_reg.out, x2_reg.out] = {0,1,2,3,1,2,3,8,2,3,4,5,3,4,5,6}
-
-# x3 register: capture alu_out when add_en, else hold
-.LUT x3_nxt [add_en, alu_out.out, x3_reg.out] = {0,0,0,0,8,8,8,8,8,8,8,8,8,8,8,8}
+# x3 register: 8 when add_en active, else 0
+.LUT x3_nxt [add_en.out] = {0,8}
 .REG x3_reg [x3_nxt.out]
 
 # Output: x3_reg when out_en
-.LUT result [x3_reg.out, out_en] = {0,0,0,0,8,8,8,8}
-
-# Halt
-.LUT halt_n [out_en, halted] = {0,1,0,0}
-.REG halted [halt_n.out]
+.LUT result [x3_reg.out, out_en.out] = {0,0,8,0}
 
 .PIN result = result.out
-.PIN state_dbg0 = state0.out
-.PIN state_dbg1 = state1.out
 .END

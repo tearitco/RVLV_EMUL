@@ -1,0 +1,38 @@
+# 74HC161: 4-bit programmable counter with carry chain
+# Inputs: D0-D3 (parallel data), CLK, EN (count enable), MR (active-low reset), PL (active-low load)
+# Outputs: Q0-Q3, CO (carry output when count=15 & EN=1)
+# Truth table: index = q | (d<<1) | (pl<<2) | (toggle<<3)
+#   PL=0: load D (toggle bit ignored)
+#   PL=1, toggle=0: hold Q
+#   PL=1, toggle=1: toggle Q (XOR 1)
+.FABRIC 4 4
+.LUT en_count [en_in, pl_in] = {0,0,0,1}
+.LUT q0_next [q0_reg.q, d0_in, pl_in, en_count.out] = {0,0,1,1,0,1,0,1,0,0,1,1,1,0,1,0}
+.LUT c1_and [en_count.out, q0_reg.q] = {0,0,0,1}
+.LUT q1_next [q1_reg.q, d1_in, pl_in, c1_and.out] = {0,0,1,1,0,1,0,1,0,0,1,1,1,0,1,0}
+.LUT c2_and [c1_and.out, q1_reg.q] = {0,0,0,1}
+.LUT q2_next [q2_reg.q, d2_in, pl_in, c2_and.out] = {0,0,1,1,0,1,0,1,0,0,1,1,1,0,1,0}
+.LUT c3_and [c2_and.out, q2_reg.q] = {0,0,0,1}
+.LUT q3_next [q3_reg.q, d3_in, pl_in, c3_and.out] = {0,0,1,1,0,1,0,1,0,0,1,1,1,0,1,0}
+.LUT q0_mr [q0_next.out, mr_in] = {0,0,0,1}
+.LUT q1_mr [q1_next.out, mr_in] = {0,0,0,1}
+.LUT q2_mr [q2_next.out, mr_in] = {0,0,0,1}
+.LUT q3_mr [q3_next.out, mr_in] = {0,0,0,1}
+.LUT carry_out [c3_and.out, q3_reg.q, q0_reg.q] = {0,0,0,0,0,0,0,1}
+.REG q0_reg [q0_mr.out] clk clk_en=1
+.REG q1_reg [q1_mr.out] clk clk_en=1
+.REG q2_reg [q2_mr.out] clk clk_en=1
+.REG q3_reg [q3_mr.out] clk clk_en=1
+.PIN q0 = q0_reg.q
+.PIN q1 = q1_reg.q
+.PIN q2 = q2_reg.q
+.PIN q3 = q3_reg.q
+.PIN co = carry_out.out
+.PIN d0 = d0_in
+.PIN d1 = d1_in
+.PIN d2 = d2_in
+.PIN d3 = d3_in
+.PIN en = en_in
+.PIN pl = pl_in
+.PIN mr = mr_in
+.END

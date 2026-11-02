@@ -1,0 +1,12 @@
+int FD, 0
+
+slit s16, "test_output.txt"
+sfopen x8, s16
+sw x8, 0(x0)
+li x1, 12345
+sfmt s17, "%d", x1
+swrite x8, s17
+sfclose x8
+li x1, 1
+builtin_out x1
+halt

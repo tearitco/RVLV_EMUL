@@ -1,0 +1,32 @@
+# 74HC251: 8:1 Line Selector/Decoder with Complementary Outputs
+# Inputs: d0-d7 (data), s0,s1,s2 (select), g_n (enable, active-low)
+# Outputs: y (selected data), y_bar (complement of y)
+# When g_n=1: y=0, y_bar=1 (disabled)
+# When g_n=0: y = d_{index}, y_bar = ~y where index = s0|s1<<1|s2<<2
+# Implemented as LUT4-cascaded tree of 2:1 muxes
+# y_out index: s2 | (m_low<<1) | (m_high<<2) | (g_n<<3)
+#   g_n=0: y = s2 ? m_high : m_low   | g_n=1: y = 0
+.FABRIC 4 4
+.LUT m01 [s0_in, d0_in, d1_in] = {0,0,1,0,0,1,1,1,0,0,0,0,0,0,0,0}
+.LUT m23 [s0_in, d2_in, d3_in] = {0,0,1,0,0,1,1,1,0,0,0,0,0,0,0,0}
+.LUT m45 [s0_in, d4_in, d5_in] = {0,0,1,0,0,1,1,1,0,0,0,0,0,0,0,0}
+.LUT m67 [s0_in, d6_in, d7_in] = {0,0,1,0,0,1,1,1,0,0,0,0,0,0,0,0}
+.LUT m_low [s1_in, m01.out, m23.out] = {0,0,1,0,0,1,1,1,0,0,0,0,0,0,0,0}
+.LUT m_high [s1_in, m45.out, m67.out] = {0,0,1,0,0,1,1,1,0,0,0,0,0,0,0,0}
+.LUT y_out [s2_in, m_low.out, m_high.out, g_n_in] = {0,0,1,0,0,1,1,1,0,0,0,0,0,0,0,0}
+.LUT y_bar_out [s2_in, m_low.out, m_high.out, g_n_in] = {1,1,0,1,1,0,0,0,1,1,1,1,1,1,1,1}
+.PIN d0_in = d0_in
+.PIN d1_in = d1_in
+.PIN d2_in = d2_in
+.PIN d3_in = d3_in
+.PIN d4_in = d4_in
+.PIN d5_in = d5_in
+.PIN d6_in = d6_in
+.PIN d7_in = d7_in
+.PIN s0_in = s0_in
+.PIN s1_in = s1_in
+.PIN s2_in = s2_in
+.PIN g_n_in = g_n_in
+.PIN y = y_out.out
+.PIN y_bar = y_bar_out.out
+.END

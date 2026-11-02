@@ -42,6 +42,10 @@ int cpu_pmp_ok(CPU *cpu, uint64_t addr, uint64_t nbytes, int access, int priv)
 {
     if (cpu->csr[PMPCFG0] == 0x0f && cpu->csr[PMPADDR0] == 0x3fffffffffffffffull)
         return 1;
+    uint64_t dram_base = 0x80000000ull;
+    uint64_t dram_size = cpu->bus.dram.size;
+    if (priv == PRIV_M && addr >= dram_base && addr < dram_base + dram_size)
+        return 1;
     int any = 0;
     uint64_t prev = 0;
     for (int i = 0; i < 16; i++) {

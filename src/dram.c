@@ -19,7 +19,7 @@ void dram_free(DRAM *dram)
     if (!dram)
         return;
     free(dram->mem);
-    dram->mem = nullptr;
+    dram->mem = NULL;
     dram->size = 0;
 }
 

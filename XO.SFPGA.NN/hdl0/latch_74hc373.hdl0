@@ -1,0 +1,38 @@
+# 74HC374: 8-bit D-type flip-flop with enable (edge-triggered, positive edge)
+# Inputs: D0-D7 (data), CLK, OE (output enable, active-low - when OE=1, outputs are 0)
+# Outputs: Q0-Q7
+.FABRIC 4 4
+.LUT oe_gate0 [d0_in, oe_in] = {0,1,0,0}
+.LUT oe_gate1 [d1_in, oe_in] = {0,1,0,0}
+.LUT oe_gate2 [d2_in, oe_in] = {0,1,0,0}
+.LUT oe_gate3 [d3_in, oe_in] = {0,1,0,0}
+.LUT oe_gate4 [d4_in, oe_in] = {0,1,0,0}
+.LUT oe_gate5 [d5_in, oe_in] = {0,1,0,0}
+.LUT oe_gate6 [d6_in, oe_in] = {0,1,0,0}
+.LUT oe_gate7 [d7_in, oe_in] = {0,1,0,0}
+.REG q0_reg [oe_gate0.out] clk clk_en=1
+.REG q1_reg [oe_gate1.out] clk clk_en=1
+.REG q2_reg [oe_gate2.out] clk clk_en=1
+.REG q3_reg [oe_gate3.out] clk clk_en=1
+.REG q4_reg [oe_gate4.out] clk clk_en=1
+.REG q5_reg [oe_gate5.out] clk clk_en=1
+.REG q6_reg [oe_gate6.out] clk clk_en=1
+.REG q7_reg [oe_gate7.out] clk clk_en=1
+.PIN q0 = q0_reg.q
+.PIN q1 = q1_reg.q
+.PIN q2 = q2_reg.q
+.PIN q3 = q3_reg.q
+.PIN q4 = q4_reg.q
+.PIN q5 = q5_reg.q
+.PIN q6 = q6_reg.q
+.PIN q7 = q7_reg.q
+.PIN d0 = d0_in
+.PIN d1 = d1_in
+.PIN d2 = d2_in
+.PIN d3 = d3_in
+.PIN d4 = d4_in
+.PIN d5 = d5_in
+.PIN d6 = d6_in
+.PIN d7 = d7_in
+.PIN oe = oe_in
+.END

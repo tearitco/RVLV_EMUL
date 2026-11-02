@@ -23,7 +23,8 @@ static void usage(void)
             "      --dump            print PC and registers each instruction\n"
             "      --trace-trap      print exceptions and interrupts\n"
             "      --max-inst N      stop after N instructions\n"
-            "      --selftest        run built-in ISA checks\n");
+            "      --selftest        run built-in ISA checks\n"
+            "      --dump-fb FILE    dump framebuffer to PPM file after exit\n");
 }
 
 static int eq(const char *a, const char *b)
@@ -33,16 +34,17 @@ static int eq(const char *a, const char *b)
 
 int main(int argc, char **argv)
 {
-    const char *kernel = nullptr;
-    const char *bios = nullptr;
-    const char *disk = nullptr;
-    const char *initrd = nullptr;
-    const char *dtb_file = nullptr;
+    const char *kernel = NULL;
+    const char *bios = NULL;
+    const char *disk = NULL;
+    const char *initrd = NULL;
+    const char *dtb_file = NULL;
     const char *bootargs = "console=ttyS0,115200n8 earlycon root=/dev/vda rw rootwait";
     int linux_boot = 0;
     int virtio_legacy = 0;
     int dump = 0;
     int trace_trap = 0;
+    const char *fb_dump_path = NULL;
     uint64_t mem_mib = DEFAULT_DRAM_MIB;
     uint64_t max_inst = 0;
 
@@ -74,9 +76,11 @@ int main(int argc, char **argv)
         else if (eq(argv[i], "--trace-trap"))
             trace_trap = 1;
         else if ((eq(argv[i], "-m") || eq(argv[i], "--mem")) && i + 1 < argc) {
-            mem_mib = strtoull(argv[++i], nullptr, 0);
-        } else if (eq(argv[i], "--max-inst") && i + 1 < argc)
-            max_inst = strtoull(argv[++i], nullptr, 0);
+            mem_mib = strtoull(argv[++i], NULL, 0);
+        }         else if (eq(argv[i], "--max-inst") && i + 1 < argc)
+            max_inst = strtoull(argv[++i], NULL, 0);
+        else if ((eq(argv[i], "--dump-fb") && i + 1 < argc))
+            fb_dump_path = argv[++i];
         else if (argv[i][0] != '-' && !kernel)
             kernel = argv[i];
         else {
@@ -107,13 +111,13 @@ int main(int argc, char **argv)
     uint64_t ksize = 0;
     if (bios) {
         uint64_t bentry = DRAM_BASE;
-        if (load_image(&cpu, bios, DRAM_BASE, &bentry, nullptr) < 0) {
+        if (load_image(&cpu, bios, DRAM_BASE, &bentry, NULL) < 0) {
             cpu_destroy(&cpu);
             return 1;
         }
         entry = bentry;
         if (kernel) {
-            if (load_image(&cpu, kernel, 0x80200000ull, nullptr, &ksize) < 0) {
+            if (load_image(&cpu, kernel, 0x80200000ull, NULL, &ksize) < 0) {
                 cpu_destroy(&cpu);
                 return 1;
             }
@@ -128,7 +132,7 @@ int main(int argc, char **argv)
     uint64_t initrd_start = 0, initrd_end = 0;
     if (initrd) {
         initrd_start = DRAM_BASE + cpu.bus.dram.size - 8 * 1024 * 1024ull;
-        if (load_image(&cpu, initrd, initrd_start, &initrd_start, nullptr) < 0) {
+        if (load_image(&cpu, initrd, initrd_start, &initrd_start, NULL) < 0) {
             cpu_destroy(&cpu);
             return 1;
         }
@@ -155,7 +159,7 @@ int main(int argc, char **argv)
     int need_dtb = linux_boot || bios || dtb_file;
     if (dtb_file) {
         uint64_t e = dtb_addr;
-        if (load_image(&cpu, dtb_file, dtb_addr, &e, nullptr) < 0) {
+        if (load_image(&cpu, dtb_file, dtb_addr, &e, NULL) < 0) {
             cpu_destroy(&cpu);
             return 1;
         }
@@ -202,6 +206,8 @@ int main(int argc, char **argv)
     }
     uart_restore_term();
     int code = cpu.halt_code;
+    if (fb_dump_path)
+        bus_dump_fb(&cpu.bus, fb_dump_path);
     cpu_destroy(&cpu);
     return code;
 }

@@ -1,0 +1,25 @@
+# 74HC138: 3-to-8 line decoder/demultiplexer
+# Inputs: A0 (addr0), A1 (addr1), A2 (addr2), EN (enable, active-high)
+# Outputs: Y0-Y7 (active-high, only one high for valid address when enabled)
+.FABRIC 4 4
+.LUT y0 [a0_in, a1_in, a2_in, en_in] = {0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0}
+.LUT y1 [a0_in, a1_in, a2_in, en_in] = {0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0}
+.LUT y2 [a0_in, a1_in, a2_in, en_in] = {0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0}
+.LUT y3 [a0_in, a1_in, a2_in, en_in] = {0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0}
+.LUT y4 [a0_in, a1_in, a2_in, en_in] = {0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0}
+.LUT y5 [a0_in, a1_in, a2_in, en_in] = {0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0}
+.LUT y6 [a0_in, a1_in, a2_in, en_in] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0}
+.LUT y7 [a0_in, a1_in, a2_in, en_in] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1}
+.PIN y0 = y0.out
+.PIN y1 = y1.out
+.PIN y2 = y2.out
+.PIN y3 = y3.out
+.PIN y4 = y4.out
+.PIN y5 = y5.out
+.PIN y6 = y6.out
+.PIN y7 = y7.out
+.PIN a0 = a0_in
+.PIN a1 = a1_in
+.PIN a2 = a2_in
+.PIN en = en_in
+.END

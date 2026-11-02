@@ -1,0 +1,41 @@
+# 74HC595: 8-bit Serial-In Parallel-Out Shift Register
+# Inputs: ds (serial data), oe_n (output enable, active-low), mr_n (master reset, active-low)
+# Outputs: q0-q7 (parallel outputs)
+# Operation: On each clock cycle, shifts DS into bit 7, bit 7 shifts out to bit 6, etc.
+# Note: SH_CP is the FPGA global clock; ST_CP functionality is merged into the clock model
+.FABRIC 4 4
+.LUT sr0_next [ds_in, q0_reg.q] = {0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1}
+.LUT sr1_next [q0_reg.q, q1_reg.q] = {0,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1}
+.LUT sr2_next [q1_reg.q, q2_reg.q] = {0,0,0,0,1,1,1,1,0,0,0,0,1,1,1,1}
+.LUT sr3_next [q2_reg.q, q3_reg.q] = {0,1,0,1,1,0,1,0,1,0,1,0,0,1,0,1}
+.LUT sr4_next [q3_reg.q, q4_reg.q] = {0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1}
+.LUT sr5_next [q4_reg.q, q5_reg.q] = {0,0,0,0,1,1,1,1,0,0,1,1,1,1,0,0}
+.LUT sr6_next [q5_reg.q, q6_reg.q] = {0,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1}
+.LUT sr7_next [q6_reg.q, q7_reg.q] = {0,1,0,1,1,0,1,0,0,1,0,1,1,0,1,0}
+.LUT oe0 [q0_reg.q, oe_n_in] = {0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0}
+.LUT oe1 [q1_reg.q, oe_n_in] = {0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0}
+.LUT oe2 [q2_reg.q, oe_n_in] = {0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0}
+.LUT oe3 [q3_reg.q, oe_n_in] = {0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0}
+.LUT oe4 [q4_reg.q, oe_n_in] = {0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0}
+.LUT oe5 [q5_reg.q, oe_n_in] = {0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0}
+.LUT oe6 [q6_reg.q, oe_n_in] = {0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0}
+.LUT oe7 [q7_reg.q, oe_n_in] = {0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0}
+.REG sr0 [sr7_next.out] clk clk_en=1
+.REG sr1 [sr0_next.out] clk clk_en=1
+.REG sr2 [sr1_next.out] clk clk_en=1
+.REG sr3 [sr2_next.out] clk clk_en=1
+.REG sr4 [sr3_next.out] clk clk_en=1
+.REG sr5 [sr4_next.out] clk clk_en=1
+.REG sr6 [sr5_next.out] clk clk_en=1
+.REG sr7 [sr6_next.out] clk clk_en=1
+.PIN ds_in = ds_in
+.PIN oe_n_in = oe_n_in
+.PIN q0 = oe0.out
+.PIN q1 = oe1.out
+.PIN q2 = oe2.out
+.PIN q3 = oe3.out
+.PIN q4 = oe4.out
+.PIN q5 = oe5.out
+.PIN q6 = oe6.out
+.PIN q7 = oe7.out
+.END

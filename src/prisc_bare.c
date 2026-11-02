@@ -287,7 +287,7 @@ static void trim(char *str) {
 typedef enum { OP_ADDI, OP_ADD, OP_SUB, OP_ANDI, OP_ORI, OP_XORI, OP_SLLI, OP_SRLI, OP_SLL, OP_SLT, OP_SLTU, OP_XOR, OP_OR, OP_SRL, OP_SRA, OP_BEQ, OP_BNE, OP_LW, OP_SW, OP_JALR, OP_J, OP_HALT, OP_CUSTOM, OP_READ_HISTORY, OP_EXEC, OP_HIT_FRAME, OP_READ_STATE, OP_READ_ACTIVE_TARGET, OP_READ_ENV_KEY, OP_READ_LAYOUT, OP_READ_POS, OP_ECALL,
     OP_SLIT, OP_SCPY, OP_SAPPEND, OP_SGETENV, OP_SFMT, OP_SREAD, OP_SSPLIT,
     OP_SFIND, OP_SLEN, OP_SFOPEN, OP_SFAPPEND, OP_SWRITE, OP_SFCLOSE,
-    OP_SBEQ, OP_SBNE, OP_STRIM, OP_SATOI } OpBase;
+    OP_SBEQ, OP_SBNE, OP_STRIM, OP_SATOI, OP_SWBIN } OpBase;
 
 typedef struct {
     OpBase op;
@@ -549,6 +549,10 @@ static void parse_line(char *line, int pass) {
             /* SFCLOSE ss1 - close file ss1 */
             sscanf(line, "%*s s%d", &i->ss1);
             i->op = OP_SFCLOSE;
+        } else if (strcmp(part, "swbin") == 0) {
+            /* SWBIN xFD, xADDR, xLEN - write raw bytes from memory to file */
+            sscanf(line, "%*s x%d, x%d, x%d", &i->rs1, &i->rs2, &i->rs3);
+            i->op = OP_SWBIN;
         } else if (strcmp(part, "sbeq") == 0) {
             /* SBEQ ss1, ss2, label - branch if string eq */
             sscanf(line, "%*s s%d, s%d, %s", &i->ss1, &i->ss2, i->label_ref);
@@ -792,6 +796,30 @@ static void exec_satoi(Inst *i) {
     strcpy(sregs[i->sd], buf);
 }
 
+static void exec_swbin(Inst *i) {
+    int fd = (int)regs[i->rs1];
+    uint64_t addr = regs[i->rs2];
+    uint64_t len = regs[i->rs3];
+    if (fd < 0) return;
+    if (addr >= (uint64_t)MEM_SIZE * 8) return;
+    if (addr + len > (uint64_t)MEM_SIZE * 8) len = (uint64_t)MEM_SIZE * 8 - addr;
+    if (len == 0) return;
+    uint8_t buf[64];
+    uint64_t total = 0;
+    while (total < len) {
+        uint64_t chunk = len - total;
+        if (chunk > sizeof(buf)) chunk = sizeof(buf);
+        for (uint64_t j = 0; j < chunk; j++) {
+            uint64_t ba = addr + total + j;
+            uint64_t wi = ba / 8;
+            uint64_t bo = ba % 8;
+            buf[j] = (uint8_t)((dmem[wi] >> (bo * 8)) & 0xFF);
+        }
+        sys_write(fd, buf, chunk);
+        total += chunk;
+    }
+}
+
 static void exec_string_op(Inst *i) {
     switch (i->op) {
         case OP_SLIT:    exec_slit(i);    break;
@@ -806,6 +834,7 @@ static void exec_string_op(Inst *i) {
         case OP_SFAPPEND:exec_sfappend(i);break;
         case OP_SWRITE:  exec_swrite(i);  break;
         case OP_SFCLOSE: exec_sfclose(i); break;
+        case OP_SWBIN:   exec_swbin(i);   break;
         case OP_SBEQ:    exec_sbeq(i);    break;
         case OP_SBNE:    exec_sbne(i);    break;
         case OP_STRIM:   exec_strim(i);   break;

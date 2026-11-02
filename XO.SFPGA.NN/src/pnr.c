@@ -51,8 +51,9 @@ typedef struct {
     uint8_t n_inputs;
     char inputs[MAX_LUT_INPUTS][MAX_NAME];
     char output_name[MAX_NAME];
-    uint8_t truth_table[16];
-    uint8_t tt_count;
+    uint32_t truth_table[256];
+     uint8_t is_byte_lut;
+    uint8_t tt_count;       /* unused, kept for compatibility */
 } pnr_lut_t;
 
 typedef struct {
@@ -130,7 +131,7 @@ static char *parse_signal_list(char *p, char inputs[][MAX_NAME], int *count, int
     return p;
 }
 
-static char *parse_braced_tt(char *p, uint8_t tt[16], int max) {
+static char *parse_braced_tt(char *p, uint32_t tt[], int max) {
     p = skip_ws_ret(p);
     if (*p == '{') p++;
     int idx = 0;
@@ -141,11 +142,11 @@ static char *parse_braced_tt(char *p, uint8_t tt[16], int max) {
         char *end = p;
         long v = strtol(p, &end, 0);
         if (end != p) {
-            tt[idx++] = (uint8_t)(v & 0xFF);
+            tt[idx++] = (uint32_t)v;
             p = end;
         } else p++;
     }
-    while (idx < 16) tt[idx++] = 0;
+    while (idx < max) tt[idx++] = 0;
     return p;
 }
 
@@ -208,7 +209,7 @@ static int parse_hdl0(ctx_t *ctx, const char *filename) {
     FILE *f = fopen(filename, "r");
     if (!f) return -1;
 
-    char line[512];
+    char line[8192];
     while (fgets(line, sizeof(line), f)) {
         char *p = skip_ws_ret(line);
         if (*p == '#' || *p == '\0' || *p == '\n') continue;
@@ -221,6 +222,7 @@ static int parse_hdl0(ctx_t *ctx, const char *filename) {
             strcmp(keyword, ".LUT4") == 0) {
             if (ctx->n_luts >= MAX_LUTS) continue;
             pnr_lut_t *lut = &ctx->luts[ctx->n_luts++];
+            memset(lut, 0, sizeof(pnr_lut_t));
             p = parse_word(p, lut->output_name, MAX_NAME);
             char inputs[MAX_LUT_INPUTS][MAX_NAME];
             int n_in = 0;
@@ -231,6 +233,23 @@ static int parse_hdl0(ctx_t *ctx, const char *filename) {
             p = parse_braced_tt(p, lut->truth_table, 16);
             if (n_in <= 3) lut->tt_count = 8;
             else lut->tt_count = 16;
+            continue;
+        }
+
+        if (strcmp(keyword, ".LUT_BYTE") == 0) {
+            if (ctx->n_luts >= MAX_LUTS) continue;
+            pnr_lut_t *lut = &ctx->luts[ctx->n_luts++];
+            memset(lut, 0, sizeof(pnr_lut_t));
+            lut->is_byte_lut = 1;
+            p = parse_word(p, lut->output_name, MAX_NAME);
+            char inputs[MAX_LUT_INPUTS][MAX_NAME];
+            int n_in = 0;
+            p = parse_signal_list(p, inputs, &n_in, MAX_LUT_INPUTS);
+            for (int i = 0; i < n_in && i < MAX_LUT_INPUTS; i++)
+                strncpy(lut->inputs[i], inputs[i], MAX_NAME - 1);
+            lut->n_inputs = (uint8_t)n_in;
+            p = parse_braced_tt(p, lut->truth_table, 256);
+            lut->tt_count = 256;
             continue;
         }
 
@@ -372,16 +391,14 @@ static int emit_bitstream(ctx_t *ctx, const char *filename) {
         uint8_t out_wire = resolve_signal(ctx, lut->output_name);
         uint8_t n_in = lut->n_inputs;
         if (n_in > 8) n_in = 8;
-        fprintf(f, ".LUT %d %d %d %d",
+        fprintf(f, "%s %d %d %d %d",
+                lut->is_byte_lut ? ".LUT_BYTE" : ".LUT",
                 lut->clb_row, lut->clb_col, lut->lut_idx, n_in);
         for (int j = 0; j < n_in; j++) {
             fprintf(f, " %d", resolve_signal(ctx, lut->inputs[j]));
         }
         fprintf(f, " %d {", out_wire);
-        int tt_count = 16;
-        fprintf(stderr, "DEBUG: emit LUT out_wire=%d n_in=%d tt[0]=%d tt[1]=%d tt[5]=%d tt[10]=%d\n",
-            out_wire, n_in, lut->truth_table[0], lut->truth_table[1], 
-            lut->truth_table[5], lut->truth_table[10]);
+        int tt_count = lut->is_byte_lut ? 256 : 16;
         for (int j = 0; j < tt_count; j++) {
             fprintf(f, "%d%s", lut->truth_table[j], j < tt_count - 1 ? "," : "");
         }

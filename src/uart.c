@@ -92,7 +92,7 @@ static int cons_readable(void)
     struct timeval tv = {0, 0};
     FD_ZERO(&rfds);
     FD_SET(STDIN_FILENO, &rfds);
-    return select(STDIN_FILENO + 1, &rfds, nullptr, nullptr, &tv) > 0;
+    return select(STDIN_FILENO + 1, &rfds, NULL, NULL, &tv) > 0;
 #endif
 }
 

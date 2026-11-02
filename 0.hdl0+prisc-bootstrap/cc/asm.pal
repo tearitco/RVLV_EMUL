@@ -27,8 +27,14 @@ pass1_loop:
     sfind x3, s1, ":"
     addi x4, x3, 1
     beq x4, x0, is_directive_p1
-    # Skip "main:" label - it shouldn not get an index
+    # Skip "main:" label - it should not get an index
     sfind x3, s1, "main:"
+    addi x4, x3, 1
+    beq x4, x0, chk_skip_p1
+    j pass1_next
+chk_skip_p1:
+    # Skip "skip_tens:" label - it uses hardcoded offset in branch
+    sfind x3, s1, "skip_tens:"
     addi x4, x3, 1
     beq x4, x0, store_label_p1
     j pass1_next
@@ -42,6 +48,9 @@ store_label_p1:
     j pass1_next
 is_directive_p1:
     sfind x3, s1, ".global"
+    addi x4, x3, 1
+    bne x4, x0, pass1_next
+    sfind x3, s1, ".align"
     addi x4, x3, 1
     bne x4, x0, pass1_next
     sfind x3, s1, ".align"
@@ -180,8 +189,15 @@ p12b:
     # --- li x10, 1 ---
     sfind x3, s1, "li x10, 1"
     addi x4, x3, 1
-    beq x4, x0, p13
+    beq x4, x0, p12c
     li x1, 1049875
+    j write_inst
+p12c:
+    # --- li x10, 42 ---
+    sfind x3, s1, "li x10, 42"
+    addi x4, x3, 1
+    beq x4, x0, p13
+    li x1, 44041491
     j write_inst
 p13:
     # --- li x10, 0 ---
@@ -329,7 +345,74 @@ p33:
     li x1, 10860083
     j write_inst
 p34:
-    # Branches (label index: loop_start=0, loop_body=1, loop_end=2, if_else=3, if_end=4)
+    # --- Additional instructions for print_emit ---
+    sfind x3, s1, "li x13, 268435456"
+    addi x4, x3, 1
+    beq x4, x0, p34b
+    li x1, 1273869
+    j write_inst
+p34b:
+    sfind x3, s1, "li x11, 13"
+    addi x4, x3, 1
+    beq x4, x0, p34c
+    li x1, 13709323
+    j write_inst
+p34c:
+    sfind x3, s1, "li x12, 10"
+    addi x4, x3, 1
+    beq x4, x0, p34d
+    li x1, 10563596
+    j write_inst
+p34d:
+    sfind x3, s1, "mul x14, x10, x11"
+    addi x4, x3, 1
+    beq x4, x0, p34e
+    li x1, 45559822
+    j write_inst
+p34e:
+    sfind x3, s1, "srli x14, x14, 7"
+    addi x4, x3, 1
+    beq x4, x0, p34f
+    li x1, 7811086
+    j write_inst
+p34f:
+    sfind x3, s1, "mul x15, x14, x12"
+    addi x4, x3, 1
+    beq x4, x0, p34g
+    li x1, 46608399
+    j write_inst
+p34g:
+    sfind x3, s1, "sub x10, x10, x15"
+    addi x4, x3, 1
+    beq x4, x0, p34h
+    li x1, 1089941514
+    j write_inst
+p34h:
+    sfind x3, s1, "addi x14, x14, 48"
+    addi x4, x3, 1
+    beq x4, x0, p34i
+    li x1, 50802702
+    j write_inst
+p34i:
+    sfind x3, s1, "sw x14, 0(x13)"
+    addi x4, x3, 1
+    beq x4, x0, p34j
+    li x1, 15114275
+    j write_inst
+p34j:
+    sfind x3, s1, "mul x14, x10, x11"
+    addi x4, x3, 1
+    beq x4, x0, p34k
+    li x1, 45559822
+    j write_inst
+p34k:
+    # --- beq x14, x0, skip_tens (offset=12 bytes, skip 2 instructions) ---
+    sfind x3, s1, "beq x14, x0, skip_tens"
+    addi x4, x3, 1
+    beq x4, x0, p34m
+    li x1, 460387
+    j write_inst
+p34m:
     sfind x3, s1, "beq x12, x0, if_else"
     addi x4, x3, 1
     beq x4, x0, p35
@@ -498,6 +581,11 @@ unknown:
 
 write_inst:
     builtin_out x1
+    # Reload file descriptor (x8 may be clobbered by branch/jump handlers)
+    lw x8, 1(x0)
+    # Convert instruction encoding to decimal string and write to file
+    sfmt s17, "%d", x1
+    swrite x8, s17
     lw x3, 2(x0)
     addi x3, x3, 4
     sw x3, 2(x0)

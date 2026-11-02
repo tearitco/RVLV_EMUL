@@ -74,7 +74,7 @@ void virtio_free(VIRTIO *v)
     if (!v)
         return;
     free(v->disk);
-    v->disk = nullptr;
+    v->disk = NULL;
     v->disk_size = 0;
 }
 

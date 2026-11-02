@@ -32,8 +32,10 @@ Implement a RISC-V assembler in prisc+x `.pal` syntax, enabling self-hosting ins
 - [x] Verify `test_linux.pal` still works correctly
 - [x] Compile `prisc_bare.c` with RISC-V cross-compiler (clean build)
 
-### Phase 4: Documentation & Release (In Progress)
-- [ ] Create `ROADMAP.md` (this file)
+### Phase 4: Documentation & Release (Complete)
+- [x] Create `ROADMAP.md` (this file)
+- [x] Create `docs/ASSEMBLER.md` — asm.pal RV64I assembler reference
+- [x] Update `README.md` — assembler section + roadmap status
 - [ ] Commit all changes to GitHub
 
 ## Instruction Coverage

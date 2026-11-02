@@ -40,6 +40,7 @@
 #define OP_CONNECT    3
 #define OP_PIN        4
 #define OP_CONFIG     5
+#define OP_LUT_BYTE   6
 
 #define BITSTREAM_MAGIC FPGA_BITSTREAM_MAGIC
 #define BITSTREAM_VERSION FPGA_BITSTREAM_VERSION
@@ -66,7 +67,7 @@ static int parse_uint(char **p) {
     return val;
 }
 
-static void parse_tt16(char *s, char *end, uint8_t tt[16]) {
+static void parse_tt16(char *s, char *end, fpga_word_t tt[16]) {
     int idx = 0;
     char *tok = s;
     while (tok < end && idx < 16) {
@@ -80,13 +81,35 @@ static void parse_tt16(char *s, char *end, uint8_t tt[16]) {
         char *val_end = tok;
         long v = strtol(tok, &val_end, 0);
         if (val_end != tok) {
-            tt[idx++] = (uint8_t)(v & 0xFF);
+            tt[idx++] = (fpga_word_t)v;
             tok = val_end;
         } else {
             tok++;
         }
     }
     while (idx < 16) tt[idx++] = 0;
+}
+static void parse_tt256(char *s, char *end, fpga_word_t tt[256]) {
+    int idx = 0;
+    char *tok = s;
+    while (tok < end && idx < 256) {
+        skip_ws(&tok);
+        if (*tok == '\0' || tok >= end) break;
+        if (*tok == ',') { tok++; continue; }
+        if (*tok == '}') break;
+        while (tok < end && isspace((unsigned char)*tok)) tok++;
+        if (tok >= end) break;
+        if (*tok == ',' || *tok == '}') break;
+        char *val_end = tok;
+        long v = strtol(tok, &val_end, 0);
+        if (val_end != tok) {
+            tt[idx++] = (fpga_word_t)v;
+            tok = val_end;
+        } else {
+            tok++;
+        }
+    }
+    while (idx < 256) tt[idx++] = 0;
 }
 
 int fpga_bs_load(bitstream_t *bs, const char *filename) {
@@ -97,7 +120,7 @@ int fpga_bs_load(bitstream_t *bs, const char *filename) {
     FILE *f = fopen(filename, "r");
     if (!f) return -1;
 
-    char line[512];
+    char line[8192];
     while (fgets(line, sizeof(line), f) && bs->num_entries < 256) {
         char *p = line;
         skip_ws(&p);
@@ -110,6 +133,26 @@ int fpga_bs_load(bitstream_t *bs, const char *filename) {
             p += 7;
             bs->rows = (uint8_t)parse_uint(&p);
             bs->cols = (uint8_t)parse_uint(&p);
+            continue;
+        }
+        if (strncmp(p, ".LUT_BYTE", 9) == 0) {
+            p += 9;
+            e->op = OP_LUT_BYTE;
+            e->is_byte_lut = 1;
+            e->clb_row = (uint8_t)parse_uint(&p);
+            e->clb_col = (uint8_t)parse_uint(&p);
+            e->lut_idx = (uint8_t)parse_uint(&p);
+            e->n_inputs = (uint8_t)parse_uint(&p);
+            for (int i = 0; i < e->n_inputs && i < BUS_WIDTH; i++)
+                e->inputs[i] = (uint8_t)parse_uint(&p);
+            e->output_wire = (uint8_t)parse_uint(&p);
+            skip_ws(&p);
+            char *tt_start = strchr(p, '{');
+            if (tt_start) {
+                char *tt_end = strchr(tt_start, '}');
+                if (tt_end) parse_tt256(tt_start + 1, tt_end, e->truth_table);
+            }
+            bs->num_entries++;
             continue;
         }
         if (strncmp(p, ".LUT", 4) == 0) {
@@ -144,6 +187,20 @@ int fpga_bs_load(bitstream_t *bs, const char *filename) {
             e->output_wire = (uint8_t)parse_uint(&p);
             e->clk_en = (uint8_t)parse_uint(&p);
             e->clk_src = (uint8_t)parse_uint(&p);
+            /* Optional init_values: init=v0,v1,v2,v3 */
+            skip_ws(&p);
+            while (*p) {
+                if (strncmp(p, "init=", 5) == 0) {
+                    p += 5;
+                    e->init_values[0] = (uint8_t)parse_uint(&p);
+                    if (*p == ',') { p++; e->init_values[1] = (uint8_t)parse_uint(&p); }
+                    if (*p == ',') { p++; e->init_values[2] = (uint8_t)parse_uint(&p); }
+                    if (*p == ',') { p++; e->init_values[3] = (uint8_t)parse_uint(&p); }
+                    break;
+                }
+                if (*p == ',') p++;
+                else break;
+            }
             bs->num_entries++;
             continue;
         }
@@ -206,7 +263,8 @@ int fpga_bs_apply(fpga_t *fpga, const bitstream_t *bs) {
 
         switch (e->op) {
             case OP_LUT3:
-            case OP_LUT4: {
+            case OP_LUT4:
+            case OP_LUT_BYTE: {
                 if (e->lut_idx >= MAX_LUTS_PER_CLB) continue;
                 lut_t *lut = &clb->luts[e->lut_idx];
                 memset(lut, 0, sizeof(lut_t));
@@ -214,7 +272,12 @@ int fpga_bs_apply(fpga_t *fpga, const bitstream_t *bs) {
                 if (lut->n_inputs > BUS_WIDTH) lut->n_inputs = BUS_WIDTH;
                 for (int j = 0; j < lut->n_inputs; j++)
                     lut->inputs[j] = e->inputs[j];
-                memcpy(lut->truth_table, e->truth_table, LUT_SIZE_4);
+                if (e->op == OP_LUT_BYTE) {
+                    lut->is_byte_lut = 1;
+                    memcpy(lut->truth_table, e->truth_table, FPGA_LUT_BYTE_SIZE * sizeof(fpga_word_t));
+                } else {
+                    memcpy(lut->truth_table, e->truth_table, LUT_SIZE_4 * sizeof(fpga_word_t));
+                }
                 lut->output_wire = e->output_wire;
                 break;
             }
@@ -224,6 +287,8 @@ int fpga_bs_apply(fpga_t *fpga, const bitstream_t *bs) {
                 memset(reg, 0, sizeof(reg_t));
                 for (int j = 0; j < 4; j++)
                     reg->d[j] = e->d[j];
+                for (int j = 0; j < 4; j++)
+                    reg->q[j] = e->init_values[j];
                 reg->output_wire = e->output_wire;
                 reg->clk_en = e->clk_en;
                 break;
@@ -246,19 +311,23 @@ int fpga_bs_apply(fpga_t *fpga, const bitstream_t *bs) {
 
 __attribute__((unused))
 static void lut_init(lut_t *lut) {
-    memset(lut->truth_table, 0, LUT_SIZE_4);
+    memset(lut->truth_table, 0, LUT_SIZE_4 * sizeof(fpga_word_t));
     lut->n_inputs = 0;
     lut->output_wire = 0;
     lut->output = 0;
 }
 
-static uint8_t lut_eval(lut_t *lut, fpga_t *fpga) {
+static fpga_word_t lut_eval(lut_t *lut, fpga_t *fpga) {
     uint8_t index = 0;
-    for (int i = 0; i < lut->n_inputs; i++) {
-        index |= (fpga->wires[lut->inputs[i]] << i);
+    if (lut->is_byte_lut && lut->n_inputs > 0) {
+        index = (uint8_t)(fpga->wires[lut->inputs[0]] & 0xFF);
+    } else {
+        for (int i = 0; i < lut->n_inputs; i++) {
+            index |= (fpga->wires[lut->inputs[i]] << i);
+        }
+        if (lut->n_inputs <= 3) index &= 0x07;
+        else index &= 0x0F;
     }
-    if (lut->n_inputs <= 3) index &= 0x07;
-    else index &= 0x0F;
     lut->output = lut->truth_table[index];
     fpga->wires[lut->output_wire] = lut->output;
     return lut->output;
@@ -267,12 +336,12 @@ static uint8_t lut_eval(lut_t *lut, fpga_t *fpga) {
 static void reg_cycle(reg_t *reg, fpga_t *fpga) {
     if (reg->clk && reg->clk_en) {
         for (int i = 0; i < 4; i++) {
-            reg->q[i] = fpga->wires[reg->d[i]];
+            reg->q[i] = (uint8_t)(fpga->wires[reg->d[i]] & 0xFF);
         }
     }
     uint8_t val = 0;
     for (int i = 0; i < 4; i++) val |= (reg->q[i] << i);
-    fpga->wires[reg->output_wire] = val;
+    fpga->wires[reg->output_wire] = (fpga_word_t)val;
 }
 
 static void switchbox_eval(fpga_t *fpga) {
@@ -336,20 +405,20 @@ void fpga_cycle(fpga_t *fpga) {
     }
 }
 
-void fpga_set_wire(fpga_t *fpga, uint8_t wire, uint8_t value) {
+void fpga_set_wire(fpga_t *fpga, uint8_t wire, fpga_word_t value) {
     fpga->wires[wire] = value;
 }
 
-uint8_t fpga_get_wire(fpga_t *fpga, uint8_t wire) {
+fpga_word_t fpga_get_wire(fpga_t *fpga, uint8_t wire) {
     return fpga->wires[wire];
 }
 
-void fpga_set_pin(fpga_t *fpga, uint8_t pin, uint8_t value) {
+void fpga_set_pin(fpga_t *fpga, uint8_t pin, fpga_word_t value) {
     if (pin < MAX_PINS && fpga->pin_dir[pin] == 0)
         fpga->io_pins[pin].values[1] = value;
 }
 
-uint8_t fpga_get_pin(fpga_t *fpga, uint8_t pin) {
+fpga_word_t fpga_get_pin(fpga_t *fpga, uint8_t pin) {
     if (pin < MAX_PINS) return fpga->io_pins[pin].values[1];
     return 0;
 }

@@ -28,5 +28,6 @@ int bus_init(BUS *bus, uint64_t dram_size, const char *disk_path, int virtio_leg
 void bus_free(BUS *bus);
 Trap bus_load(BUS *bus, uint64_t addr, uint64_t bits, uint64_t *out);
 Trap bus_store(BUS *bus, uint64_t addr, uint64_t bits, uint64_t value);
+void bus_dump_fb(BUS *bus, const char *path);
 
 #endif

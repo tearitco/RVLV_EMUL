@@ -1,0 +1,33 @@
+# rv16_prog: Programmable RISC-V-like processor on FPGA
+.FABRIC 4 4
+# PC counter (3-bit, loops at PC 4)
+.LUT pc_next [pc.q] = {1,2,3,4,4,6,7,0}
+.REG pc [pc_next.out] clk_en=1
+# Program ROM
+.LUT inst [pc.q] = {0,1,2,3,7,7,7,7}
+# Decode
+.LUT is_ld3 [inst.out] = {1,0,0,0,0,0,0,0}
+.LUT is_ld5 [inst.out] = {0,1,0,0,0,0,0,0}
+.LUT is_add [inst.out] = {0,0,1,0,0,0,0,0}
+.LUT is_out [inst.out] = {0,0,0,1,0,0,0,0}
+# x1 register
+.LUT x1_imm [is_ld3.out] = {0,3}
+.LUT x1_hold [x1_reg.q] = {0,1,2,3,4,5,6,7}
+.LUT x1_nxt [is_ld3.out, x1_imm.out, x1_hold.out] = {0,0,0,3,3,0,0,3}
+.REG x1_reg [x1_nxt.out] clk_en=1
+# x2 register
+.LUT x2_imm [is_ld5.out] = {0,5}
+.LUT x2_hold [x2_reg.q] = {0,1,2,3,4,5,6,7}
+.LUT x2_nxt [is_ld5.out, x2_imm.out, x2_hold.out] = {0,0,0,5,5,0,0,5}
+.REG x2_reg [x2_nxt.out] clk_en=1
+# ALU: x1 + x2 = 8 (for x1=3, x2=5)
+.LUT alu_out [x1_reg.q, x2_reg.q] = {0,3,5,8,0,0,0,0}
+# x3 register
+.LUT x3_nxt [is_add.out] = {0,8}
+.REG x3_reg [x3_nxt.out] clk_en=1
+# Output: x3=8 when OUT active (x3_lsb=0, out_lsb=1 -> idx=2 -> tt[2]=8)
+.LUT result [x3_reg.out, is_out.out] = {0,0,8,0}
+.PIN result_pin 1 result.out
+.PIN pc_pin 1 pc.q
+.PIN inst_pin 1 inst.out
+.END

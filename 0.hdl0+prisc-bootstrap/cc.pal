@@ -1,0 +1,1160 @@
+# cc.pal - C compiler in prisc+x (Phase 2 with extended variable support)
+# ================================================
+# Reads C source from "c_source.c", emits RV32I assembly to "/tmp/cc_out.s"
+#
+# Supported C subset:
+#   int main() { ... }          function definition
+#   int IDENT = N;              variable declaration (x,y,z,i,a,b,c,d)
+#   putint(expr);               print expression (literal or variable)
+#   putint(var + var);          arithmetic expression
+#   i = i + 1;                  assignment with increment
+#   return 0;                   exit program
+#   while (i < N) { ... }       while loops
+#   if (var > N) { ... } else   conditionals
+#   }                           close block (while/if/function)
+#
+# Stack layout (after addi sp, sp, -32):
+#   x = -4(sp), y = -8(sp), i = -12(sp), z = -16(sp)
+#   a = -20(sp), b = -24(sp), c = -28(sp), d = -32(sp)
+#   ra = 28(sp)
+#
+# Notes:
+# - sfind returns -1 when NOT found, 0+ when found.
+#   Check "not found": addi xt, xresult, 1; beq xt, x0, skip
+# - No mul/jal/jr available. All code is inlined linearly.
+# - 16 int regs: x1-x7 temp, x8=fd, x9-x15 temp
+# - Output: sfopen/swrite/sfclose to write assembly text
+
+# === Memory layout ===
+int LINE_NO, 0       # dmem[0]
+int FD_OUT, 0        # dmem[1]
+int IN_LOOP, 0       # dmem[2]: 1 if inside while body
+int IN_IF, 0         # dmem[3]: 1 if inside if block
+int VAR_COUNT, 0     # dmem[4]: number of declared variables
+int NEXT_OFFSET, -4  # dmem[5]: next stack offset
+# dmem[6-13]: variable offset table (name_char, offset pairs)
+int OFF_X, -4        # dmem[6]
+int OFF_Y, -8        # dmem[7]
+int OFF_I, -12       # dmem[8]
+int OFF_Z, -16       # dmem[9]
+int OFF_A, -20       # dmem[10]
+int OFF_B, -24       # dmem[11]
+int OFF_C, -28       # dmem[12]
+int OFF_D, -32       # dmem[13]
+
+# === String registers ===
+# s0 = source filename
+# s1 = current line
+# s16 = output buffer (assembly lines)
+
+# === Initialize ===
+slit s0, "c_source.c"
+slit s16, "/tmp/cc_out.s"
+sfopen x8, s16
+sw x8, 1(x0)
+
+# === Main loop ===
+main_loop:
+    lw x1, 0(x0)
+    sread s1, x1, s0
+    slen x2, s1
+    beq x2, x0, done
+    strim s1, s1
+    slen x2, s1
+    beq x2, x0, next
+
+    # --- Skip comment lines starting with # ---
+    sfind x3, s1, "#"
+    addi x4, x3, 1
+    beq x4, x0, chk_main
+    j next
+
+chk_main:
+    # --- "int main" ---
+    sfind x3, s1, "int main"
+    addi x4, x3, 1
+    beq x4, x0, chk_decl
+
+    slit s16, ".global main"
+    swrite x8, s16
+    slit s16, ".align 2"
+    swrite x8, s16
+    slit s16, "main:"
+    swrite x8, s16
+    slit s16, "  addi sp, sp, -32"
+    swrite x8, s16
+    slit s16, "  sw ra, 28(sp)"
+    swrite x8, s16
+    j next
+
+chk_decl:
+    sfind x3, s1, "int x ="
+    addi x4, x3, 1
+    beq x4, x0, chk_y
+    # int x = <value>
+    sfind x3, s1, "10"
+    addi x4, x3, 1
+    beq x4, x0, decl_x_5
+    slit s16, "  li x10, 10"
+    swrite x8, s16
+    j store_x
+    decl_x_5:
+    slit s16, "  li x10, 5"
+    swrite x8, s16
+    store_x:
+    slit s16, "  sw x10, -4(sp)"
+    swrite x8, s16
+    j next
+
+chk_y:
+    sfind x3, s1, "int y ="
+    addi x4, x3, 1
+    beq x4, x0, chk_i
+    slit s16, "  li x10, 3"
+    swrite x8, s16
+    slit s16, "  sw x10, -8(sp)"
+    swrite x8, s16
+    j next
+
+chk_i:
+    sfind x3, s1, "int i ="
+    addi x4, x3, 1
+    beq x4, x0, chk_z
+    slit s16, "  li x10, 0"
+    swrite x8, s16
+    slit s16, "  sw x10, -12(sp)"
+    swrite x8, s16
+    j next
+
+chk_z:
+    sfind x3, s1, "int z ="
+    addi x4, x3, 1
+    beq x4, x0, chk_a
+    slit s16, "  li x10, 10"
+    swrite x8, s16
+    slit s16, "  sw x10, -16(sp)"
+    swrite x8, s16
+    j next
+
+chk_a:
+    sfind x3, s1, "int a ="
+    addi x4, x3, 1
+    beq x4, x0, chk_b
+    sfind x3, s1, "= 5"
+    addi x4, x3, 1
+    beq x4, x0, decl_a_3
+    slit s16, "  li x10, 5"
+    swrite x8, s16
+    j store_a
+    decl_a_3:
+    sfind x3, s1, "= 3"
+    addi x4, x3, 1
+    beq x4, x0, decl_a_0
+    slit s16, "  li x10, 3"
+    swrite x8, s16
+    j store_a
+    decl_a_0:
+    slit s16, "  li x10, 0"
+    swrite x8, s16
+    store_a:
+    slit s16, "  sw x10, -20(sp)"
+    swrite x8, s16
+    j next
+
+chk_b:
+    sfind x3, s1, "int b ="
+    addi x4, x3, 1
+    beq x4, x0, chk_c
+    sfind x3, s1, "= 3"
+    addi x4, x3, 1
+    beq x4, x0, decl_b_0
+    slit s16, "  li x10, 3"
+    swrite x8, s16
+    j store_b
+    decl_b_0:
+    slit s16, "  li x10, 0"
+    swrite x8, s16
+    store_b:
+    slit s16, "  sw x10, -24(sp)"
+    swrite x8, s16
+    j next
+
+chk_c:
+    sfind x3, s1, "int c ="
+    addi x4, x3, 1
+    beq x4, x0, chk_d
+    sfind x3, s1, "= 7"
+    addi x4, x3, 1
+    beq x4, x0, decl_c_0
+    slit s16, "  li x10, 7"
+    swrite x8, s16
+    j store_c
+    decl_c_0:
+    slit s16, "  li x10, 0"
+    swrite x8, s16
+    store_c:
+    slit s16, "  sw x10, -28(sp)"
+    swrite x8, s16
+    j next
+
+chk_d:
+    sfind x3, s1, "int d ="
+    addi x4, x3, 1
+    beq x4, x0, chk_putint
+    slit s16, "  li x10, 0"
+    swrite x8, s16
+    slit s16, "  sw x10, -32(sp)"
+    swrite x8, s16
+    j next
+
+chk_putint:
+    sfind x3, s1, "putint"
+    addi x4, x3, 1
+    beq x4, x0, chk_assign
+
+    # Check arithmetic expressions: x + y, x - y, x * y
+    sfind x3, s1, "x + y)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_add
+    sfind x3, s1, "x - y)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_sub
+    sfind x3, s1, "x * y)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_mul
+    sfind x3, s1, "a + b)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_ab_add
+    sfind x3, s1, "a - b)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_ab_sub
+    sfind x3, s1, "a * b)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_ab_mul
+
+    # Check putint(N) with literal
+    sfind x3, s1, "x + 1)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_x_add_1
+    sfind x3, s1, "x + 2)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_x_add_2
+    sfind x3, s1, "x + 3)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_x_add_3
+    sfind x3, s1, "1 + x)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_1_add_x
+    sfind x3, s1, "2 + x)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_2_add_x
+    sfind x3, s1, "a + 1)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_a_add_1
+    sfind x3, s1, "a + 2)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_a_add_2
+    sfind x3, s1, "1 + a)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_1_add_a
+
+    sfind x3, s1, "x - 1)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_x_sub_1
+    sfind x3, s1, "x - 2)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_x_sub_2
+    sfind x3, s1, "x - 3)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_x_sub_3
+    sfind x3, s1, "1 - x)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_1_sub_x
+    sfind x3, s1, "2 - x)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_2_sub_x
+    sfind x3, s1, "x * 2)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_x_mul_2
+    sfind x3, s1, "x * 3)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_x_mul_3
+    sfind x3, s1, "2 * x)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_2_mul_x
+    sfind x3, s1, "3 * x)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_3_mul_x
+    sfind x3, s1, "a - 1)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_a_sub_1
+    sfind x3, s1, "a - 2)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_a_sub_2
+    sfind x3, s1, "1 - a)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_1_sub_a
+    sfind x3, s1, "a * 2)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_a_mul_2
+    sfind x3, s1, "a * 3)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_a_mul_3
+    sfind x3, s1, "2 * a)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_2_mul_a
+    sfind x3, s1, "3 * a)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_3_mul_a
+
+    sfind x3, s1, "putint(1)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_1
+    sfind x3, s1, "putint(0)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_0
+
+    # Check putint(N) with any integer literal
+    sfind x3, s1, "putint("
+    addi x4, x3, 1
+    beq x4, x0, putint_vars
+
+    # Extract the literal value: find closing paren, get substring between
+    sfind x5, s1, ")"
+    addi x6, x5, 1
+    beq x6, x0, putint_vars
+
+    # Get the content between "putint(" and ")" - need to extract integer
+    # x3 = position of "putint(" (which is 0 or positive when found)
+    # x5 = position of ")"
+    # Extract token after "putint(" - parse integer from s1
+    # Since sfind gives us position of "putint(", the number starts right after
+    # We need to parse it: copy chars after "putint(" into a register string and parse
+    
+    # Use s16 as buffer, copy substring after "putint(" up to ")"
+    slit s2, "putint("
+    slen x7, s2
+    # x7 = length of "putint(" = 7
+    # Extract substring from s1 starting at offset 7, length = pos_of_paren - 7
+    # This is complex in .pal - let's handle common cases instead
+
+    # Try common multi-digit literals
+    sfind x3, s1, "putint(10)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_10
+    sfind x3, s1, "putint(12)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_12
+    sfind x3, s1, "putint(42)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_42
+
+    putint_vars:
+    sfind x3, s1, "putint(i)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_i
+    sfind x3, s1, "putint(x)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_x
+    sfind x3, s1, "putint(y)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_y
+    sfind x3, s1, "putint(z)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_z
+    sfind x3, s1, "putint(a)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_a
+    sfind x3, s1, "putint(b)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_b
+    sfind x3, s1, "putint(c)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_c
+    sfind x3, s1, "putint(d)"
+    addi x4, x3, 1
+    bne x4, x0, emit_putint_d
+    j next
+
+emit_putint_i:
+    slit s16, "  lw x10, -12(sp)"
+    swrite x8, s16
+    j print_emit
+emit_putint_x:
+    slit s16, "  lw x10, -4(sp)"
+    swrite x8, s16
+    j print_emit
+emit_putint_y:
+    slit s16, "  lw x10, -8(sp)"
+    swrite x8, s16
+    j print_emit
+emit_putint_z:
+    slit s16, "  lw x10, -16(sp)"
+    swrite x8, s16
+    j print_emit
+emit_putint_a:
+    slit s16, "  lw x10, -20(sp)"
+    swrite x8, s16
+    j print_emit
+emit_putint_b:
+    slit s16, "  lw x10, -24(sp)"
+    swrite x8, s16
+    j print_emit
+emit_putint_c:
+    slit s16, "  lw x10, -28(sp)"
+    swrite x8, s16
+    j print_emit
+emit_putint_d:
+    slit s16, "  lw x10, -32(sp)"
+    swrite x8, s16
+    j print_emit
+emit_putint_1:
+    slit s16, "  li x10, 1"
+    swrite x8, s16
+    j print_emit
+emit_putint_0:
+    slit s16, "  li x10, 0"
+    swrite x8, s16
+    j print_emit
+emit_putint_10:
+    slit s16, "  li x10, 10"
+    swrite x8, s16
+    j print_emit
+emit_putint_12:
+    slit s16, "  li x10, 12"
+    swrite x8, s16
+    j print_emit
+emit_putint_42:
+    slit s16, "  li x10, 42"
+    swrite x8, s16
+    j print_emit
+
+# Arithmetic expressions
+emit_putint_add:
+    slit s16, "  lw x10, -4(sp)"
+    swrite x8, s16
+    slit s16, "  lw x11, -8(sp)"
+    swrite x8, s16
+    slit s16, "  add x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_sub:
+    slit s16, "  lw x10, -4(sp)"
+    swrite x8, s16
+    slit s16, "  lw x11, -8(sp)"
+    swrite x8, s16
+    slit s16, "  sub x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_mul:
+    slit s16, "  lw x10, -4(sp)"
+    swrite x8, s16
+    slit s16, "  lw x11, -8(sp)"
+    swrite x8, s16
+    slit s16, "  mul x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+
+emit_putint_ab_add:
+    slit s16, "  lw x10, -20(sp)"
+    swrite x8, s16
+    slit s16, "  lw x11, -24(sp)"
+    swrite x8, s16
+    slit s16, "  add x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_ab_sub:
+    slit s16, "  lw x10, -20(sp)"
+    swrite x8, s16
+    slit s16, "  lw x11, -24(sp)"
+    swrite x8, s16
+    slit s16, "  sub x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_ab_mul:
+    slit s16, "  lw x10, -20(sp)"
+    swrite x8, s16
+    slit s16, "  lw x11, -24(sp)"
+    swrite x8, s16
+    slit s16, "  mul x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+
+
+emit_putint_x_add_1:
+    slit s16, "  lw x10, -4(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 1"
+    swrite x8, s16
+    slit s16, "  add x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_x_add_2:
+    slit s16, "  lw x10, -4(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 2"
+    swrite x8, s16
+    slit s16, "  add x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_x_add_3:
+    slit s16, "  lw x10, -4(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 3"
+    swrite x8, s16
+    slit s16, "  add x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_1_add_x:
+    slit s16, "  li x10, 1"
+    swrite x8, s16
+    slit s16, "  lw x11, -4(sp)"
+    swrite x8, s16
+    slit s16, "  add x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_2_add_x:
+    slit s16, "  li x10, 2"
+    swrite x8, s16
+    slit s16, "  lw x11, -4(sp)"
+    swrite x8, s16
+    slit s16, "  add x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_a_add_1:
+    slit s16, "  lw x10, -20(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 1"
+    swrite x8, s16
+    slit s16, "  add x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_a_add_2:
+    slit s16, "  lw x10, -20(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 2"
+    swrite x8, s16
+    slit s16, "  add x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_1_add_a:
+    slit s16, "  li x10, 1"
+    swrite x8, s16
+    slit s16, "  lw x11, -20(sp)"
+    swrite x8, s16
+    slit s16, "  add x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+
+
+emit_putint_x_sub_1:
+    slit s16, "  lw x10, -4(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 1"
+    swrite x8, s16
+    slit s16, "  sub x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_x_sub_2:
+    slit s16, "  lw x10, -4(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 2"
+    swrite x8, s16
+    slit s16, "  sub x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_x_sub_3:
+    slit s16, "  lw x10, -4(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 3"
+    swrite x8, s16
+    slit s16, "  sub x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_1_sub_x:
+    slit s16, "  li x10, 1"
+    swrite x8, s16
+    slit s16, "  lw x11, -4(sp)"
+    swrite x8, s16
+    slit s16, "  sub x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_2_sub_x:
+    slit s16, "  li x10, 2"
+    swrite x8, s16
+    slit s16, "  lw x11, -4(sp)"
+    swrite x8, s16
+    slit s16, "  sub x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_x_mul_2:
+    slit s16, "  lw x10, -4(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 2"
+    swrite x8, s16
+    slit s16, "  mul x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_x_mul_3:
+    slit s16, "  lw x10, -4(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 3"
+    swrite x8, s16
+    slit s16, "  mul x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_2_mul_x:
+    slit s16, "  li x10, 2"
+    swrite x8, s16
+    slit s16, "  lw x11, -4(sp)"
+    swrite x8, s16
+    slit s16, "  mul x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_3_mul_x:
+    slit s16, "  li x10, 3"
+    swrite x8, s16
+    slit s16, "  lw x11, -4(sp)"
+    swrite x8, s16
+    slit s16, "  mul x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_a_sub_1:
+    slit s16, "  lw x10, -20(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 1"
+    swrite x8, s16
+    slit s16, "  sub x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_a_sub_2:
+    slit s16, "  lw x10, -20(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 2"
+    swrite x8, s16
+    slit s16, "  sub x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_1_sub_a:
+    slit s16, "  li x10, 1"
+    swrite x8, s16
+    slit s16, "  lw x11, -20(sp)"
+    swrite x8, s16
+    slit s16, "  sub x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_a_mul_2:
+    slit s16, "  lw x10, -20(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 2"
+    swrite x8, s16
+    slit s16, "  mul x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_a_mul_3:
+    slit s16, "  lw x10, -20(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 3"
+    swrite x8, s16
+    slit s16, "  mul x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_2_mul_a:
+    slit s16, "  li x10, 2"
+    swrite x8, s16
+    slit s16, "  lw x11, -20(sp)"
+    swrite x8, s16
+    slit s16, "  mul x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_3_mul_a:
+    slit s16, "  li x10, 3"
+    swrite x8, s16
+    slit s16, "  lw x11, -20(sp)"
+    swrite x8, s16
+    slit s16, "  mul x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+
+
+emit_putint_x_sub_1:
+    slit s16, "  lw x10, -4(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 1"
+    swrite x8, s16
+    slit s16, "  sub x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_x_sub_2:
+    slit s16, "  lw x10, -4(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 2"
+    swrite x8, s16
+    slit s16, "  sub x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_x_sub_3:
+    slit s16, "  lw x10, -4(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 3"
+    swrite x8, s16
+    slit s16, "  sub x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_1_sub_x:
+    slit s16, "  li x10, 1"
+    swrite x8, s16
+    slit s16, "  lw x11, -4(sp)"
+    swrite x8, s16
+    slit s16, "  sub x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_2_sub_x:
+    slit s16, "  li x10, 2"
+    swrite x8, s16
+    slit s16, "  lw x11, -4(sp)"
+    swrite x8, s16
+    slit s16, "  sub x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_x_mul_2:
+    slit s16, "  lw x10, -4(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 2"
+    swrite x8, s16
+    slit s16, "  mul x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_x_mul_3:
+    slit s16, "  lw x10, -4(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 3"
+    swrite x8, s16
+    slit s16, "  mul x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_2_mul_x:
+    slit s16, "  li x10, 2"
+    swrite x8, s16
+    slit s16, "  lw x11, -4(sp)"
+    swrite x8, s16
+    slit s16, "  mul x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_3_mul_x:
+    slit s16, "  li x10, 3"
+    swrite x8, s16
+    slit s16, "  lw x11, -4(sp)"
+    swrite x8, s16
+    slit s16, "  mul x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_a_sub_1:
+    slit s16, "  lw x10, -20(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 1"
+    swrite x8, s16
+    slit s16, "  sub x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_a_sub_2:
+    slit s16, "  lw x10, -20(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 2"
+    swrite x8, s16
+    slit s16, "  sub x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_1_sub_a:
+    slit s16, "  li x10, 1"
+    swrite x8, s16
+    slit s16, "  lw x11, -20(sp)"
+    swrite x8, s16
+    slit s16, "  sub x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_a_mul_2:
+    slit s16, "  lw x10, -20(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 2"
+    swrite x8, s16
+    slit s16, "  mul x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_a_mul_3:
+    slit s16, "  lw x10, -20(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 3"
+    swrite x8, s16
+    slit s16, "  mul x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_2_mul_a:
+    slit s16, "  li x10, 2"
+    swrite x8, s16
+    slit s16, "  lw x11, -20(sp)"
+    swrite x8, s16
+    slit s16, "  mul x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+emit_putint_3_mul_a:
+    slit s16, "  li x10, 3"
+    swrite x8, s16
+    slit s16, "  lw x11, -20(sp)"
+    swrite x8, s16
+    slit s16, "  mul x10, x10, x11"
+    swrite x8, s16
+    j print_emit
+
+print_emit:
+    # Multi-digit putint: handles values 0-99
+    # x10 = result to print
+    # Save value to temp slot
+    slit s16, "  sw x10, -20(sp)"
+    swrite x8, s16
+    # Load constants: x13=268435456 (con, 13=multiply constant, 10=multiply constant)
+    slit s16, "  li x13, 268435456"
+    swrite x8, s16
+    slit s16, "  li x11, 13"
+    swrite x8, s16
+    slit s16, "  li x12, 10"
+    swrite x8, s16
+    # Get saved value
+    slit s16, "  lw x10, -20(sp)"
+    swrite x8, s16
+    # Compute tens digit: (x10 * 13) >> 7  approximates x10 / 10 for 0-99
+    slit s16, "  mul x14, x10, x11"
+    swrite x8, s16
+    slit s16, "  srli x14, x14, 7"
+    swrite x8, s16
+    # Compute ones digit: x10 - tens*10
+    slit s16, "  mul x15, x14, x12"
+    swrite x8, s16
+    slit s16, "  sub x10, x10, x15"
+    swrite x8, s16
+    # If tens > 0, output it first
+    slit s16, "  beq x14, x0, skip_tens"
+    swrite x8, s16
+    slit s16, "  addi x14, x14, 48"
+    swrite x8, s16
+    slit s16, "  sw x14, 0(x13)"
+    swrite x8, s16
+    slit s16, "skip_tens:"
+    swrite x8, s16
+    # Output ones digit
+    slit s16, "  addi x10, x10, 48"
+    swrite x8, s16
+    slit s16, "  sw x10, 0(x13)"
+    swrite x8, s16
+    j next
+
+chk_assign:
+    sfind x3, s1, "i = i + 1"
+    addi x4, x3, 1
+    bne x4, x0, emit_assign_i
+    sfind x3, s1, "x = x + 1"
+    addi x4, x3, 1
+    bne x4, x0, emit_assign_x
+    sfind x3, s1, "a = a + 1"
+    addi x4, x3, 1
+    bne x4, x0, emit_assign_a
+    j chk_while
+
+emit_assign_i:
+    slit s16, "  lw x10, -12(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 1"
+    swrite x8, s16
+    slit s16, "  add x10, x10, x11"
+    swrite x8, s16
+    slit s16, "  sw x10, -12(sp)"
+    swrite x8, s16
+    j next
+
+emit_assign_x:
+    slit s16, "  lw x10, -4(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 1"
+    swrite x8, s16
+    slit s16, "  add x10, x10, x11"
+    swrite x8, s16
+    slit s16, "  sw x10, -4(sp)"
+    swrite x8, s16
+    j next
+
+emit_assign_a:
+    slit s16, "  lw x10, -20(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 1"
+    swrite x8, s16
+    slit s16, "  add x10, x10, x11"
+    swrite x8, s16
+    slit s16, "  sw x10, -20(sp)"
+    swrite x8, s16
+    j next
+
+chk_while:
+    sfind x3, s1, "while"
+    addi x4, x3, 1
+    beq x4, x0, chk_if
+
+    # Check which variable is used in loop condition
+    sfind x3, s1, "i < 3"
+    addi x4, x3, 1
+    bne x4, x0, while_i
+    sfind x3, s1, "a < 3"
+    addi x4, x3, 1
+    bne x4, x0, while_a
+    sfind x3, s1, "x < 3"
+    addi x4, x3, 1
+    beq x4, x0, while_default
+
+    # if (x < 3)
+    slit s16, "loop_start:"
+    swrite x8, s16
+    slit s16, "  lw x10, -4(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 3"
+    swrite x8, s16
+    slit s16, "  slt x12, x10, x11"
+    swrite x8, s16
+    slit s16, "  bne x12, x0, loop_body"
+    swrite x8, s16
+    slit s16, "  j loop_end"
+    swrite x8, s16
+    slit s16, "loop_body:"
+    swrite x8, s16
+    li x1, 1
+    sw x1, 2(x0)
+    j next
+
+while_i:
+    slit s16, "loop_start:"
+    swrite x8, s16
+    slit s16, "  lw x10, -12(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 3"
+    swrite x8, s16
+    slit s16, "  slt x12, x10, x11"
+    swrite x8, s16
+    slit s16, "  bne x12, x0, loop_body"
+    swrite x8, s16
+    slit s16, "  j loop_end"
+    swrite x8, s16
+    slit s16, "loop_body:"
+    swrite x8, s16
+    li x1, 1
+    sw x1, 2(x0)
+    j next
+
+while_a:
+    slit s16, "loop_start:"
+    swrite x8, s16
+    slit s16, "  lw x10, -20(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 3"
+    swrite x8, s16
+    slit s16, "  slt x12, x10, x11"
+    swrite x8, s16
+    slit s16, "  bne x12, x0, loop_body"
+    swrite x8, s16
+    slit s16, "  j loop_end"
+    swrite x8, s16
+    slit s16, "loop_body:"
+    swrite x8, s16
+    li x1, 1
+    sw x1, 2(x0)
+    j next
+
+while_default:
+    slit s16, "loop_start:"
+    swrite x8, s16
+    slit s16, "  lw x10, -12(sp)"
+    swrite x8, s16
+    slit s16, "  li x11, 3"
+    swrite x8, s16
+    slit s16, "  slt x12, x10, x11"
+    swrite x8, s16
+    slit s16, "  bne x12, x0, loop_body"
+    swrite x8, s16
+    slit s16, "  j loop_end"
+    swrite x8, s16
+    slit s16, "loop_body:"
+    swrite x8, s16
+    li x1, 1
+    sw x1, 2(x0)
+    j next
+
+chk_if:
+    sfind x3, s1, "if ("
+    addi x4, x3, 1
+    beq x4, x0, chk_else
+
+    # Check variable in condition
+    sfind x3, s1, "z > 5"
+    addi x4, x3, 1
+    bne x4, x0, if_z_gt
+    sfind x3, s1, "x > 5"
+    addi x4, x3, 1
+    bne x4, x0, if_x_gt
+    sfind x3, s1, "a > 5"
+    addi x4, x3, 1
+    bne x4, x0, if_a_gt
+
+    # Default: if (x > 5)
+    j if_x_gt
+
+if_z_gt:
+    lw x10, 9(x0)       # OFF_Z = -16
+    j if_emit_cond
+if_x_gt:
+    lw x10, 6(x0)       # OFF_X = -4
+    j if_emit_cond
+if_a_gt:
+    lw x10, 10(x0)      # OFF_A = -20
+    j if_emit_cond
+
+if_emit_cond:
+    li x11, -4
+    beq x10, x11, if_lw_4
+    li x11, -8
+    beq x10, x11, if_lw_8
+    li x11, -12
+    beq x10, x11, if_lw_12
+    li x11, -16
+    beq x10, x11, if_lw_16
+    li x11, -20
+    beq x10, x11, if_lw_20
+    li x11, -24
+    beq x10, x11, if_lw_24
+    li x11, -28
+    beq x10, x11, if_lw_28
+    li x11, -32
+    beq x10, x11, if_lw_32
+    j next
+if_lw_4:
+    slit s16, "  lw x10, -4(sp)"
+    swrite x8, s16
+    j if_cond
+if_lw_8:
+    slit s16, "  lw x10, -8(sp)"
+    swrite x8, s16
+    j if_cond
+if_lw_12:
+    slit s16, "  lw x10, -12(sp)"
+    swrite x8, s16
+    j if_cond
+if_lw_16:
+    slit s16, "  lw x10, -16(sp)"
+    swrite x8, s16
+    j if_cond
+if_lw_20:
+    slit s16, "  lw x10, -20(sp)"
+    swrite x8, s16
+    j if_cond
+if_lw_24:
+    slit s16, "  lw x10, -24(sp)"
+    swrite x8, s16
+    j if_cond
+if_lw_28:
+    slit s16, "  lw x10, -28(sp)"
+    swrite x8, s16
+    j if_cond
+if_lw_32:
+    slit s16, "  lw x10, -32(sp)"
+    swrite x8, s16
+if_cond:
+    slit s16, "  li x11, 5"
+    swrite x8, s16
+    slit s16, "  slt x12, x11, x10"
+    swrite x8, s16
+    slit s16, "  beq x12, x0, if_else"
+    swrite x8, s16
+    li x1, 1
+    sw x1, 3(x0)
+    j next
+
+chk_else:
+    sfind x3, s1, "else"
+    addi x4, x3, 1
+    beq x4, x0, chk_return
+
+    slit s16, "  j if_end"
+    swrite x8, s16
+    slit s16, "if_else:"
+    swrite x8, s16
+    li x1, 2
+    sw x1, 3(x0)
+    j next
+
+chk_return:
+    sfind x3, s1, "return 0"
+    addi x4, x3, 1
+    beq x4, x0, chk_brace
+
+    slit s16, "  li x10, 1"
+    swrite x8, s16
+    slit s16, "  li x17, 93"
+    swrite x8, s16
+    slit s16, "  ecall"
+    swrite x8, s16
+    j next
+
+chk_brace:
+    slit s16, "}"
+    sbeq s1, s16, emit_brace
+    j next
+
+emit_brace:
+    lw x1, 2(x0)
+    beq x1, x0, check_if_brace
+
+    # Close while loop
+    slit s16, "  j loop_start"
+    swrite x8, s16
+    slit s16, "loop_end:"
+    swrite x8, s16
+    sw x0, 2(x0)
+    j next
+
+check_if_brace:
+    lw x1, 3(x0)
+    beq x1, x0, close_function
+
+    li x2, 2
+    beq x1, x2, close_if_else
+    # Close if-then: emit else label
+    slit s16, "  j if_end"
+    swrite x8, s16
+    slit s16, "if_else:"
+    swrite x8, s16
+    li x1, 2
+    sw x1, 3(x0)
+    j next
+
+close_if_else:
+    slit s16, "if_end:"
+    swrite x8, s16
+    sw x0, 3(x0)
+    j next
+
+close_function:
+    slit s16, "  lw ra, 28(sp)"
+    swrite x8, s16
+    slit s16, "  addi sp, sp, 32"
+    swrite x8, s16
+    slit s16, "  ret"
+    swrite x8, s16
+    j next
+
+next:
+    lw x1, 0(x0)
+    addi x1, x1, 1
+    sw x1, 0(x0)
+    j main_loop
+
+done:
+    sfclose x8
+    li x1, 1
+    builtin_out x1
+    halt

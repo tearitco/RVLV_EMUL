@@ -1,0 +1,20 @@
+# 74HC125: Quad 3-State Buffer (active-high output enable)
+# Inputs: oe (enable, active-high), a0-a3 (data inputs)
+# Outputs: y0-y3
+# When oe=1: yn = an; When oe=0: yn = 0 (tri-stated/high-Z)
+# Each channel: LUT4 with inputs [oe, a] -> Y = oe ? a : 0
+.FABRIC 4 4
+.LUT buf0 [oe_in, a0_in] = {0,0,0,1}
+.LUT buf1 [oe_in, a1_in] = {0,0,0,1}
+.LUT buf2 [oe_in, a2_in] = {0,0,0,1}
+.LUT buf3 [oe_in, a3_in] = {0,0,0,1}
+.PIN oe_in = oe_in
+.PIN a0_in = a0_in
+.PIN a1_in = a1_in
+.PIN a2_in = a2_in
+.PIN a3_in = a3_in
+.PIN y0 = buf0.out
+.PIN y1 = buf1.out
+.PIN y2 = buf2.out
+.PIN y3 = buf3.out
+.END
