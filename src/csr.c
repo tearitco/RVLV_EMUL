@@ -69,7 +69,7 @@ void csr_write_raw(CPU *cpu, uint32_t addr, uint64_t value)
         break;
     }
     case MIDELEG:
-        cpu->csr[MIDELEG] = value & (MIP_SSIP | MIP_STIP | MIP_SEIP);
+        cpu->csr[MIDELEG] = value & (MIP_SSIP | MIP_STIP | MIP_SEIP | MIP_MTIP);
         break;
     case MEDELEG:
         cpu->csr[MEDELEG] = value & ~((1ull << 10) | (1ull << 11) | (1ull << 14));

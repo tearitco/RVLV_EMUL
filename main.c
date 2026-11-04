@@ -183,7 +183,7 @@ int main(int argc, char **argv)
         cpu.priv = PRIV_S;
         cpu.sbi = 1;
         cpu.csr[MSTATUS] = (2ULL << 32) | (2ULL << 34) | MSTATUS_FS_INITIAL | MSTATUS_SPIE;
-        cpu.csr[MIDELEG] = MIP_SSIP | MIP_STIP | MIP_SEIP;
+        cpu.csr[MIDELEG] = MIP_SSIP | MIP_STIP | MIP_SEIP | MIP_MTIP;
         cpu.csr[MEDELEG] = 0xffff;
         cpu.csr[MENVCFG] = MENVCFG_STCE | MENVCFG_ADUE;
         cpu.csr[MCOUNTEREN] = 0x7;

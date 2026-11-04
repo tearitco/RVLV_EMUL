@@ -61,9 +61,6 @@ void take_trap(CPU *cpu, Trap t)
 
 static int irq_enabled(CPU *cpu, uint64_t irqbit, int irq, bool for_wfi)
 {
-    uint64_t mie = cpu->csr[MIE];
-    if ((mie & irqbit) == 0)
-        return 0;
     int delegated = (cpu->csr[MIDELEG] >> irq) & 1;
     if (delegated) {
         if (cpu->priv > PRIV_S)
@@ -72,6 +69,10 @@ static int irq_enabled(CPU *cpu, uint64_t irqbit, int irq, bool for_wfi)
             return 0;
         return 1;
     }
+    /* Non-delegated: only M-mode can take, check MIE + MPP */
+    uint64_t mie = cpu->csr[MIE];
+    if ((mie & irqbit) == 0)
+        return 0;
     if (cpu->priv != PRIV_M)
         return 0;
     return (cpu->csr[MSTATUS] & MSTATUS_MIE) != 0;
