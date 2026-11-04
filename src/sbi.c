@@ -29,6 +29,10 @@
 #define SBI_EXT_HSM                  0x48534DULL
 #define SBI_EXT_SRST                 0x53525354ULL
 #define SBI_EXT_PMU                  0x504D55ULL
+#define SBI_EXT_DBCN                 0x4442434EULL
+#define SBI_EXT_DBCN_CONSOLE_WRITE   0
+#define SBI_EXT_DBCN_CONSOLE_READ    1
+#define SBI_EXT_DBCN_CONSOLE_WRITE_BYTE 2
 
 static void sbi_ret(CPU *cpu, int64_t err, uint64_t value)
 {
@@ -55,6 +59,9 @@ int sbi_ecall(CPU *cpu)
     uint64_t a0 = cpu->regs[10];
     uint64_t a1 = cpu->regs[11];
     (void)a1;
+
+    if (eid != SBI_EXT_SET_TIMER && eid != SBI_EXT_CONSOLE_PUTCHAR)
+        fprintf(stderr, "[SBI] ecall eid=0x%lx fid=0x%lx a0=0x%lx\n", eid, fid, a0);
 
     switch (eid) {
     case SBI_EXT_SET_TIMER:
@@ -110,7 +117,7 @@ int sbi_ecall(CPU *cpu)
             uint64_t ext = a0;
             int have = ext == SBI_EXT_BASE || ext == SBI_EXT_TIME || ext == SBI_EXT_IPI ||
                        ext == SBI_EXT_RFENCE || ext == SBI_EXT_HSM || ext == SBI_EXT_SRST || ext == SBI_EXT_PMU ||
-                       ext <= 8;
+                       ext == SBI_EXT_DBCN || ext <= 8;
             sbi_ret(cpu, SBI_SUCCESS, have ? 1 : 0);
             return 1;
         }
@@ -166,6 +173,33 @@ int sbi_ecall(CPU *cpu)
     case SBI_EXT_PMU:
         sbi_ret(cpu, SBI_ERR_NOT_SUPPORTED, 0);
         return 1;
+    case SBI_EXT_DBCN:
+        switch (fid) {
+        case SBI_EXT_DBCN_CONSOLE_WRITE:
+            fwrite((const char *)a0, 1, a1, stdout);
+            fflush(stdout);
+            sbi_ret(cpu, SBI_SUCCESS, a1);
+            return 1;
+        case SBI_EXT_DBCN_CONSOLE_READ:
+            uart_poll(&cpu->bus.uart);
+            uint64_t read = 0;
+            while (read < a1 && cpu->bus.uart.rh_count > 0) {
+                int c = cpu->bus.uart.rhr[cpu->bus.uart.rh_head];
+                cpu->bus.uart.rh_head = (cpu->bus.uart.rh_head + 1) % UART_RX_FIFO;
+                cpu->bus.uart.rh_count--;
+                ((char *)a0)[read++] = (char)c;
+            }
+            sbi_ret(cpu, SBI_SUCCESS, read);
+            return 1;
+        case SBI_EXT_DBCN_CONSOLE_WRITE_BYTE:
+            fputc((int)(uint8_t)a0, stdout);
+            fflush(stdout);
+            sbi_ret(cpu, SBI_SUCCESS, 0);
+            return 1;
+        default:
+            sbi_ret(cpu, SBI_ERR_NOT_SUPPORTED, 0);
+            return 1;
+        }
     default:
         return 0;
     }

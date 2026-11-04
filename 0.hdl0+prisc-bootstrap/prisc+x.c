@@ -226,7 +226,7 @@ typedef enum { OP_ADDI, OP_ADD, OP_SUB, OP_ANDI, OP_ORI, OP_XORI, OP_SLLI, OP_SR
 
 typedef struct {
     OpBase op;
-    int rd, rs1, rs2, imm;
+    int rd, rs1, rs2, rs3, imm;
     char label_ref[32];
     char custom_name[32];
     char literal_arg[1024];

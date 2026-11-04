@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #define MISA_VALUE ((2ULL << 62) | (1ULL << 0) | (1ULL << 2) | (1ULL << 3) | \
                     (1ULL << 5) | (1ULL << 8) | (1ULL << 12) | (1ULL << 18) | \
@@ -939,33 +940,24 @@ Trap cpu_execute(CPU *cpu, uint32_t inst, int ilen)
                         break;
                     }
                 }
-                if (cpu->priv == PRIV_M && (cpu->csr[MTVEC] & ~3ull) == 0) {
-                    uint64_t a7 = cpu->regs[17];
-                    if (a7 == SYS_EXIT || a7 == SYS_WRITE || a7 == SYS_READ ||
-                        a7 == SYS_FPGA_LOAD || a7 == SYS_OPEN || a7 == SYS_CLOSE) {
-                        uint64_t ret = syscall_handle(cpu, a7, cpu->regs[10], cpu->regs[11],
-                                                      cpu->regs[12], cpu->regs[13],
-                                                      cpu->regs[14], cpu->regs[15],
-                                                      cpu->regs[16]);
-                        cpu->regs[10] = ret;
+                if (cpu->sbi && cpu->priv == PRIV_S) {
+                    if (sbi_ecall(cpu)) {
                         cpu->pc = next;
                         break;
                     }
-                    cpu->halt = 1;
-                    cpu->halt_code = (cpu->regs[10] == 1) ? 0 : 1;
-                    cpu->pc = next;
-                    break;
                 }
+                /* Route all ecalls through syscall ABI (any privilege mode) */
                 uint64_t a7 = cpu->regs[17];
-                if (cpu->priv != PRIV_M && a7 == SYS_SPAWN) {
-                    uint64_t ret = syscall_handle(cpu, a7, cpu->regs[10], cpu->regs[11],
-                                                  cpu->regs[12], cpu->regs[13],
-                                                  cpu->regs[14], cpu->regs[15],
-                                                  cpu->regs[16]);
+                uint64_t ret = syscall_handle(cpu, a7, cpu->regs[10], cpu->regs[11],
+                                              cpu->regs[12], cpu->regs[13],
+                                              cpu->regs[14], cpu->regs[15],
+                                              cpu->regs[16]);
+                if (ret != (uint64_t)(-ENOSYS)) {
                     cpu->regs[10] = ret;
                     cpu->pc = next;
                     break;
                 }
+                /* Unsupported syscall: trap as ECALL */
                 uint64_t c = cpu->priv == PRIV_M ? EX_ECALL_M
                                                  : cpu->priv == PRIV_S ? EX_ECALL_S : EX_ECALL_U;
                 return trap_ex(c, 0);
@@ -1146,10 +1138,17 @@ void dump_registers(CPU *cpu)
     printf("pc=%" PRIx64 " priv=%u instret=%" PRIu64 "\n", cpu->pc, cpu->priv, cpu->instret);
 }
 
+static uint64_t valid_chunk(uint64_t len) {
+    if (len >= 8) return 8;
+    if (len >= 4) return 4;
+    if (len >= 2) return 2;
+    return 1;
+}
+
 Trap cpu_load_bytes(CPU *cpu, uint64_t addr, void *buf, uint64_t len) {
     uint8_t *dst = (uint8_t*)buf;
     while (len > 0) {
-        uint64_t chunk = len < 8 ? len : 8;
+        uint64_t chunk = valid_chunk(len);
         uint64_t val;
         Trap t = cpu_load(cpu, addr, chunk * 8, &val);
         if (t.taken) return t;
@@ -1166,7 +1165,7 @@ Trap cpu_load_bytes(CPU *cpu, uint64_t addr, void *buf, uint64_t len) {
 Trap cpu_store_bytes(CPU *cpu, uint64_t addr, const void *buf, uint64_t len) {
     const uint8_t *src = (const uint8_t*)buf;
     while (len > 0) {
-        uint64_t chunk = len < 8 ? len : 8;
+        uint64_t chunk = valid_chunk(len);
         uint64_t val = 0;
         for (uint64_t i = 0; i < chunk; i++) {
             val |= ((uint64_t)src[i]) << (i * 8);
