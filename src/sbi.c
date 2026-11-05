@@ -103,6 +103,10 @@ int sbi_ecall(CPU *cpu)
         cpu->regs[10] = 0;
         return 1;
     case SBI_EXT_BASE:
+        if (fid == 3) {
+            uint64_t ext = a0;
+            fprintf(stderr, "[SBI] probe ext=0x%lx\n", ext);
+        }
         switch (fid) {
         case 0:
             sbi_ret(cpu, SBI_SUCCESS, 0x02000000);
@@ -174,8 +178,10 @@ int sbi_ecall(CPU *cpu)
         sbi_ret(cpu, SBI_ERR_NOT_SUPPORTED, 0);
         return 1;
     case SBI_EXT_DBCN:
+        fprintf(stderr, "[SBI] DBCN fid=%lu a0=0x%lx a1=0x%lx\n", fid, a0, a1);
         switch (fid) {
         case SBI_EXT_DBCN_CONSOLE_WRITE:
+            fprintf(stderr, "[SBI] DBCN_WRITE len=%lu\n", a1);
             fwrite((const char *)a0, 1, a1, stdout);
             fflush(stdout);
             sbi_ret(cpu, SBI_SUCCESS, a1);

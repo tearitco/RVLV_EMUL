@@ -1078,6 +1078,48 @@ int cpu_step(CPU *cpu)
             cpu->bus.clint.mtime >= cpu->csr[STIMECMP])
             cpu->csr[MIP] |= MIP_STIP;
     }
+
+    /* Loop accelerator: detect tight loops (recent PCs cycling within a small
+     * window) and fast-forward simulated time to the next timer event. This lets
+     * time-based busy-wait loops (mdelay, udelay, calibration) exit without
+     * executing every iteration. */
+    cpu->loop_hist[cpu->loop_hist_idx & 7] = cpu->pc;
+    cpu->loop_hist_idx++;
+    if ((cpu->loop_hist_idx & 7) == 0) {
+        /* Full history buffer: check if all recent PCs are in a tight window */
+        uint64_t lo = cpu->loop_hist[0], hi = cpu->loop_hist[0];
+        for (int i = 1; i < 8; i++) {
+            if (cpu->loop_hist[i] < lo) lo = cpu->loop_hist[i];
+            if (cpu->loop_hist[i] > hi) hi = cpu->loop_hist[i];
+        }
+        if (hi - lo < 4096ull) {
+            cpu->loop_count++;
+            if (cpu->loop_count > 64ull) {
+                uint64_t now = cpu->bus.clint.mtime;
+                uint64_t target = ~0ull;
+                if ((cpu->csr[MIE] & MIP_MTIP) != 0)
+                    target = cpu->bus.clint.mtimecmp;
+                if ((cpu->csr[MENVCFG] & MENVCFG_STCE) != 0 &&
+                    (cpu->csr[MIE] & MIP_STIP) != 0 &&
+                    cpu->csr[STIMECMP] < target)
+                    target = cpu->csr[STIMECMP];
+                if (target != ~0ull && target > now)
+                    clint_tick(&cpu->bus.clint, target - now);
+                else
+                    clint_tick(&cpu->bus.clint, 1000000ull);
+                if (cpu->bus.clint.mtime >= cpu->bus.clint.mtimecmp)
+                    cpu->csr[MIP] |= MIP_MTIP;
+                if ((cpu->csr[MENVCFG] & MENVCFG_STCE) &&
+                    cpu->bus.clint.mtime >= cpu->csr[STIMECMP])
+                    cpu->csr[MIP] |= MIP_STIP;
+                cpu->loop_count = 0;
+                return 0;
+            }
+        } else {
+            cpu->loop_count = 0;
+        }
+    }
+
     if (cpu->wfi) {
         uint64_t target = ~0ull;
         int have_timer = 0;
@@ -1105,6 +1147,7 @@ int cpu_step(CPU *cpu)
     }
     uint32_t inst;
     int ilen = 4;
+    uint64_t inst_pc = cpu->pc;
     Trap t = cpu_fetch(cpu, &inst, &ilen);
     if (t.taken) {
         take_trap(cpu, t);
@@ -1114,10 +1157,44 @@ int cpu_step(CPU *cpu)
         printf("%08" PRIx64 ": %08x\n", cpu->pc, inst);
         dump_registers(cpu);
     }
+    /* Counted-loop skip: detect 2-instruction countdown loops
+     *   addi  rd, rd, -N       (at prev_pc = pc - 4)
+     *   bnez  rd, prev_pc      (at current pc)
+     * Skip remaining iterations by advancing time and pc directly. */
+    uint32_t cur_opcode = inst & 0x7f;
+    uint32_t cur_funct3 = (inst >> 12) & 7;
+    uint32_t cur_rs1 = rs1_f(inst);
+    if (cpu->prev_inst != 0 && cpu->prev_pc == inst_pc - 4) {
+        uint32_t prev_opcode = cpu->prev_inst & 0x7f;
+        uint32_t prev_rd = rd_f(cpu->prev_inst);
+        int64_t prev_imm = imm_i(cpu->prev_inst);
+        if (prev_opcode == 0x13 &&              /* ADDI */
+            prev_rd == cur_rs1 &&               /* self-modifying, same reg */
+            prev_imm < 0 &&                     /* decrementing */
+            cur_opcode == B_TYPE && cur_funct3 == 1 &&  /* BNE backward */
+            inst_pc + imm_b(inst) == cpu->prev_pc) {
+            int64_t decrement = -prev_imm;
+            if (cpu->regs[cur_rs1] % (uint64_t)decrement == 0) {
+                uint64_t iterations = cpu->regs[cur_rs1] / (uint64_t)decrement;
+                if (iterations > 1) {
+                    cpu->pc = inst_pc + 4;       /* fall through */
+                    clint_tick(&cpu->bus.clint, iterations * 2);
+                    cpu->regs[cur_rs1] = 0;
+                    cpu->instret += iterations * 2;
+                    cpu->regs[0] = 0;
+                    cpu->prev_inst = inst;
+                    cpu->prev_pc = inst_pc;
+                    return 0;
+                }
+            }
+        }
+    }
     t = cpu_execute(cpu, inst, ilen);
     cpu->regs[0] = 0;
     cpu->instret++;
     clint_tick(&cpu->bus.clint, 1);
+    cpu->prev_inst = inst;
+    cpu->prev_pc = inst_pc;
     if (cpu->bus.test_exit) {
         cpu->halt = 1;
         cpu->halt_code = cpu->bus.test_code;

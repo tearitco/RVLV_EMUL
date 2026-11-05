@@ -46,6 +46,13 @@ typedef struct CPU {
     int virtio_legacy;
     uint64_t dtb_addr;
     uint64_t entry;
+    /* Loop accelerator: tight-loop detection and time fast-forward */
+    uint64_t loop_hist[8];
+    unsigned loop_hist_idx;
+    uint64_t loop_count;
+    /* Counted-loop skip: previous instruction for pattern detection */
+    uint32_t prev_inst;
+    uint64_t prev_pc;
 } CPU;
 
 int cpu_init(CPU *cpu, uint64_t dram_size, const char *disk_path, int virtio_legacy);
