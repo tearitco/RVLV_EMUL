@@ -82,10 +82,34 @@ int dram_copy_in(DRAM *dram, uint64_t addr, const uint8_t *src, uint64_t n)
 
 int dram_fill(DRAM *dram, uint64_t addr, uint8_t val, uint64_t n)
 {
-    if (n == 0)
+    if (!dram || !dram->mem || n == 0)
         return 0;
     if (!dram_in_range(dram, addr, n))
         return -1;
     memset(dram->mem + (addr - DRAM_BASE), val, (size_t)n);
     return 0;
+}
+
+Trap dram_load_fast(DRAM *dram, uint64_t addr, uint64_t bits, uint64_t *out)
+{
+    uint64_t nbytes = bits / 8;
+    if (!out || (bits != 8 && bits != 16 && bits != 32 && bits != 64))
+        return dram_fault(0);
+    uint64_t off = addr - DRAM_BASE;
+    uint64_t v = 0;
+    for (uint64_t i = 0; i < nbytes; i++)
+        v |= (uint64_t)dram->mem[off + i] << (8 * i);
+    *out = v;
+    return trap_none();
+}
+
+Trap dram_store_fast(DRAM *dram, uint64_t addr, uint64_t bits, uint64_t value)
+{
+    uint64_t nbytes = bits / 8;
+    if (bits != 8 && bits != 16 && bits != 32 && bits != 64)
+        return dram_fault(1);
+    uint64_t off = addr - DRAM_BASE;
+    for (uint64_t i = 0; i < nbytes; i++)
+        dram->mem[off + i] = (uint8_t)((value >> (8 * i)) & 0xff);
+    return trap_none();
 }

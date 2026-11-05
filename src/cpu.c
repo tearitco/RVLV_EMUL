@@ -398,10 +398,10 @@ Trap cpu_fetch(CPU *cpu, uint32_t *inst, int *ilen)
         }
     }
     uint64_t lo = 0;
-    if (dram_in_range(&cpu->bus.dram, pa, 4))
-        t = dram_load(&cpu->bus.dram, pa, 16, &lo);
-    else
+    if (!(cpu->priv == PRIV_M || (cpu->csr[SATP] >> 60) == 0))
         t = bus_load(&cpu->bus, pa, 16, &lo);
+    else
+        t = dram_load(&cpu->bus.dram, pa, 16, &lo);
     if (t.taken)
         return trap_ex(EX_INST_ACCESS, cpu->pc);
     if ((lo & 3) != 3) {
@@ -419,10 +419,10 @@ Trap cpu_fetch(CPU *cpu, uint32_t *inst, int *ilen)
             }
         }
         uint64_t hi = 0;
-        if (dram_in_range(&cpu->bus.dram, pa2, 2))
-            t = dram_load(&cpu->bus.dram, pa2, 16, &hi);
-        else
+        if (!(cpu->priv == PRIV_M || (cpu->csr[SATP] >> 60) == 0))
             t = bus_load(&cpu->bus, pa2, 16, &hi);
+        else
+            t = dram_load(&cpu->bus.dram, pa2, 16, &hi);
         if (t.taken)
             return trap_ex(EX_INST_ACCESS, cpu->pc);
         *inst = (uint32_t)lo | ((uint32_t)hi << 16);
@@ -430,10 +430,10 @@ Trap cpu_fetch(CPU *cpu, uint32_t *inst, int *ilen)
         return trap_none();
     }
     uint64_t w = 0;
-    if (dram_in_range(&cpu->bus.dram, pa, 4))
-        t = dram_load(&cpu->bus.dram, pa, 32, &w);
-    else
+    if (!(cpu->priv == PRIV_M || (cpu->csr[SATP] >> 60) == 0))
         t = bus_load(&cpu->bus, pa, 32, &w);
+    else
+        t = dram_load(&cpu->bus.dram, pa, 32, &w);
     if (t.taken)
         return trap_ex(EX_INST_ACCESS, cpu->pc);
     *inst = (uint32_t)w;
@@ -1060,11 +1060,16 @@ int cpu_step(CPU *cpu)
     cpu->regs[0] = 0;
     cpu->irq_div++;
     if ((cpu->irq_div & 31ull) == 0) {
-        Trap irq = check_interrupts(cpu, false);
-        if (irq.taken) {
-            take_trap(cpu, irq);
-            cpu->regs[0] = 0;
-            return 0;
+        /* Fast path: skip interrupt check when nothing is globally enabled */
+        uint64_t mie = cpu->csr[MIE];
+        uint64_t mstatus = cpu->csr[MSTATUS];
+        if (mie != 0 || (mstatus & (MSTATUS_MIE | MSTATUS_SIE)) != 0) {
+            Trap irq = check_interrupts(cpu, false);
+            if (irq.taken) {
+                take_trap(cpu, irq);
+                cpu->regs[0] = 0;
+                return 0;
+            }
         }
     } else {
         if (cpu->bus.clint.mtime >= cpu->bus.clint.mtimecmp)

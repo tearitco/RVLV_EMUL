@@ -3,7 +3,7 @@
 set -euo pipefail
 
 CC="${CC:-gcc}"
-CFLAGS="-O2 -std=gnu2x -Wall -Wextra -Werror -Iincludes -DNDEBUG"
+CFLAGS="-O3 -std=gnu2x -Wall -Wextra -Werror -Iincludes -DNDEBUG"
 # Compatibility shims for GCC < 12 (no C23 nullptr):
 CFLAGS="${CFLAGS} -Dnullptr=0 -Wno-error=format"
 LDFLAGS="-lm"

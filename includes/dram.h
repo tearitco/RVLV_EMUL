@@ -17,5 +17,8 @@ Trap dram_load(DRAM *dram, uint64_t addr, uint64_t bits, uint64_t *out);
 Trap dram_store(DRAM *dram, uint64_t addr, uint64_t bits, uint64_t value);
 int dram_copy_in(DRAM *dram, uint64_t addr, const uint8_t *src, uint64_t n);
 int dram_fill(DRAM *dram, uint64_t addr, uint8_t val, uint64_t n);
+/* Fast variants: caller must ensure addr is in DRAM range */
+Trap dram_load_fast(DRAM *dram, uint64_t addr, uint64_t bits, uint64_t *out);
+Trap dram_store_fast(DRAM *dram, uint64_t addr, uint64_t bits, uint64_t value);
 
 #endif
